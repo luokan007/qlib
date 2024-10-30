@@ -29,7 +29,7 @@ from qlib.data import D # 基础行情数据服务的对象
 
 global_config = {
     "qlib_init": {
-        "provider_uri":  "~/project/qlib/qlib/data/cn_data"  # 原始行情数据存放目录
+        "provider_uri":  "/home/godlike/project/data/cn_data"  # 原始行情数据存放目录
     },
     "market": 'csi300',  # 股票池
     "benchmark": "SH000300", # 基准：沪深300指数

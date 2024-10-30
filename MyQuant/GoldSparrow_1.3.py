@@ -29,7 +29,7 @@ from qlib.data import D # 基础行情数据服务的对象
 
 global_config = {
     "qlib_init": {
-        "provider_uri":  "~/project/qlib/qlib/data/cn_data"  # 原始行情数据存放目录
+        "provider_uri":  "/home/godlike/project/data/cn_data"  # 原始行情数据存放目录
     },
     "market": 'csi300',  # 股票池
     "benchmark": "SH000300", # 基准：沪深300指数
@@ -59,7 +59,7 @@ def training_process(dataset):
         "class": "LSTM",
         # 模型类所在模块
         "module_path": "qlib.contrib.model.pytorch_lstm", 
-        # 模型类超参数配置，未写的则采用默认值。这些参数传给模型类
+        # 模型类超参数配置，未写的则采用默认值。 这些参数传给模型类
         "kwargs": {  # kwargs用于初始化上面的class
              "d_feat": 158,
             "hidden_size": 64,
@@ -79,8 +79,14 @@ def training_process(dataset):
     model = init_instance_by_config(model_config)
     # 训练模型
     print("Training Model...")
-    model.fit(dataset)
-    print("Model Training Done!")
+    with R.start( experiment_name="train"): # 注意，设好实验名
+        
+        model.fit(dataset)
+        # 可选：训练好的模型以pkl文件形式保存到本次实验运行记录目录下的artifacts子目录，以备后用  
+        R.save_objects(**{"trained_model.pkl": model})
+        # 打印本次实验记录器信息，含记录器id，experiment_id等信息
+        print('info', R.get_recorder().info)
+        print("Model Training Done!")
     
     
     #将模型，数据集保存为pickle文件以备后用
@@ -308,7 +314,7 @@ def process_data():
         # 数据集类的参数配置
         "kwargs": { 
             "handler": { # 数据集使用的数据处理器配置
-                "class": "Alpha158, # 数据处理器类，继承自DataHandlerLP
+                "class": "Alpha158", # 数据处理器类，继承自DataHandlerLP
                 "module_path": "qlib.contrib.data.handler", # 数据处理器类所在模块
                 "kwargs": data_handler_config, # 数据处理器参数配置
             },
