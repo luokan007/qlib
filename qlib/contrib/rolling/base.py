@@ -92,6 +92,7 @@ class Rolling:
         self.conf_path = Path(conf_path)
         self.exp_name = exp_name
         self._rid = None  # the final combined recorder id in `exp_name`
+        self._experiment_id = None# added 
 
         self.step = step
         assert horizon is not None, "Current version does not support extracting horizon from the underlying dataset"
@@ -227,6 +228,7 @@ class Rolling:
             R.log_params(exp_name=self.rolling_exp)
             R.save_objects(**{"pred.pkl": res["pred"], "label.pkl": res["label"]})
             self._rid = R.get_recorder().id
+            self._experiment_id = R.get_recorder().experiment_id
 
     def _update_rolling_rec(self):
         """

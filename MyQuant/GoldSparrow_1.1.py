@@ -42,11 +42,11 @@ from qlib.data import D # 基础行情数据服务的对象
 
 global_config = {
     "qlib_init": {
-        "provider_uri":  "~/project/qlib/qlib/data/cn_data"  # 原始行情数据存放目录
+        "provider_uri":  "/home/godlike/project/data/cn_data"  # 原始行情数据存放目录
     },
-    "market": 'csi500',  # 股票池
+    "market": 'csi300',  # 股票池
     "benchmark": "SH000300", # 基准：沪深300指数
-    "train_start": "2005-01-01",
+    "train_start": "2008-01-01",
     "train_end": "2020-12-31", # 训练集
     "valid_start": "2021-01-01", 
     "valid_end": "2022-12-31", # 验证集
@@ -76,15 +76,15 @@ def training_process(dataset):
         "kwargs": {  # kwargs用于初始化上面的class
             "loss": "mse",
             "colsample_bytree": 0.8879,
-            "learning_rate": 0.0421,
+            "learning_rate": 0.001, #0.0421,
             "subsample": 0.8789,
             "lambda_l1": 205.6999,
             "lambda_l2": 580.9768,
-            "max_depth": 8,
+            "max_depth": 16,
             "num_leaves": 210,
             "num_threads": 20,
-            "early_stopping_rounds": 50, # 训练迭代提前停止条件
-            "num_boost_round": 1000, # 最大训练迭代次数
+            "early_stopping_rounds": 400, # 训练迭代提前停止条件
+            "num_boost_round": 2000, # 最大训练迭代次数
         }
     }
 
@@ -92,8 +92,14 @@ def training_process(dataset):
     model = init_instance_by_config(model_config)
     # 训练模型
     print("Training Model...")
-    model.fit(dataset)
-    print("Model Training Done!")
+    with R.start( experiment_name="train"): # 注意，设好实验名
+        
+        model.fit(dataset)
+        # 可选：训练好的模型以pkl文件形式保存到本次实验运行记录目录下的artifacts子目录，以备后用  
+        R.save_objects(**{"trained_model.pkl": model})
+        # 打印本次实验记录器信息，含记录器id，experiment_id等信息
+        print('info', R.get_recorder().info)
+        print("Model Training Done!")
     
     
     #将模型，数据集保存为pickle文件以备后用
@@ -274,7 +280,42 @@ def process_data():
         "end_time": end_time,
         "fit_start_time": fit_start_time,
         "fit_end_time": fit_end_time,
-        "instruments": param_stockpool,    
+        "instruments": param_stockpool, 
+        
+        "infer_processors":[
+            #{
+            #    "class": "FilterCol",
+            #    "kwargs":{
+            #        "fields_group": "feature",
+            #        "col_list": ["RESI5", "WVMA5", "RSQR5", "KLEN", 
+            #                     "RSQR10", "CORR5", "CORD5", "CORR10", 
+            #                     "ROC60", "RESI10", "VSTD5", "RSQR60",
+            #                     "CORR60", "WVMA60", "STD5", "RSQR20",
+            #                     "CORD60", "CORD10", "CORR20", "KLOW"]
+            #        }
+            #},
+            {
+                "class": "RobustZScoreNorm",
+                "kwargs":{
+                    "fields_group": "feature",
+                    "clip_outlier": "true"}
+            },
+            {
+                "class": "Fillna",
+                "kwargs":{"fields_group": "feature"}
+            },
+        ],
+         
+        "learn_processors":[
+            {
+                "class": "DropnaLabel"
+            },
+            {
+                "class": "CSRankNorm",
+                "kwargs":{"fields_group": "label"}
+            },
+        ],
+        "label": [["Ref($close, -2) / Ref($close, -1) - 1"],["LABEL0"]]   
     }
     
     
@@ -372,4 +413,4 @@ os.environ['LANG'] = 'en_US.UTF-8'
 locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
 ########
 if __name__ == "__main__":
-    main(is_process_data = False, is_train =False)
+    main(is_process_data = False, is_train =True)
