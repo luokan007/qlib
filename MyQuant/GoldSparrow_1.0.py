@@ -4,7 +4,7 @@
 # - A股全量数据
 # - 目录地址： **~/project/qlib/qlib/data**
 # 
-# wget https://github.com/chenditc/investment_data/releases/download/2024-10-16/qlib_bin.tar.gz
+# wget https://github.com/chenditc/investment_data/releases/download/2024-11-11/qlib_bin.tar.gz
 # 
 # tar -zxvf qlib_bin.tar.gz -C ~/project/qlib/qlib/data/cn_data --strip-components=1
 

@@ -33,7 +33,7 @@ global_config = {
     },
     "market": 'csi300',  # 股票池
     "benchmark": "SH000300", # 基准：沪深300指数
-    "train_start": "2005-01-01",
+    "train_start": "2008-01-01",
     "train_end": "2020-12-31", # 训练集
     "valid_start": "2021-01-01", 
     "valid_end": "2022-12-31", # 验证集
@@ -66,8 +66,8 @@ def training_process(dataset):
             "num_layers": 2,
             "dropout": 0.2,
             "n_epochs":  200,
-            "lr": 1e-4,
-            "early_stop": 50,
+            "lr": 1e-5,
+            "early_stop": 10,
             "batch_size": 800,
             "metric": "loss",
             "loss": "mse",

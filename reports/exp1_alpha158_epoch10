@@ -1,0 +1,28 @@
+exp1_alpha158_epoch10
+	model_config = {
+        # 机器学习模型参数配置
+        # 模型类
+        "class": "LSTM",
+        # 模型类所在模块
+        "module_path": "qlib.contrib.model.pytorch_lstm_ts", 
+        # 模型类超参数配置，未写的则采用默认值。这些参数传给模型类
+        "kwargs": {  # kwargs用于初始化上面的class
+             "d_feat": 20,
+            "hidden_size": 64,
+            "num_layers": 2,
+            "dropout": 0.0,
+            "n_epochs": 50, # 200,
+            "lr": 1e-3,
+            "early_stop": 10,
+            "batch_size": 800,
+            "metric": "loss",
+            "loss": "mse",
+            "GPU": 0
+        }
+    }
+
+    IC 0.022059485228598186
+	ICIR 0.1533551578217366
+	Rank IC 0.03504284505896366
+	Rank ICIR 0.24011488324565583
+

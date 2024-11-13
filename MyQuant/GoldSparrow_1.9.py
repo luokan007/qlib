@@ -64,14 +64,14 @@ def training_process(dataset):
              "d_feat": 158,
             "hidden_size": 64,
             "num_layers": 2,
-            "dropout": 0.2,
+            "dropout": 0.5,
             "n_epochs":  100,
             "lr": 1e-4,
-            "early_stop": 30,
+            "early_stop": 10,
             "batch_size": 800,
             "metric": "loss",
             "loss": "mse",
-            "n_jobs": 20,
+            "n_jobs": 8,
             "GPU": 0,
         }
     }
