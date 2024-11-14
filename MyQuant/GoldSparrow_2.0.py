@@ -253,6 +253,8 @@ def Offline_Evaluate(is_process_data = True) -> None:
 
 
 class GenerateOrder:
+    """_summary_
+    """
     def __init__(
         self,
         predict_recorder,
@@ -261,8 +263,7 @@ class GenerateOrder:
         working_dir = "/home/godlike/project/GoldSparrow/Online_Order/",
         position_csv ="position.csv",
         buy_order_csv = "buy.csv",
-        sell_order_csv = "sell.csv",
-        forbid_list = [],
+        sell_order_csv = "sell.csv"
         ):
         self.predict_recorder = predict_recorder
         self.working_dir = working_dir
@@ -271,7 +272,7 @@ class GenerateOrder:
         self.position_csv = position_csv
         self.buy_order_csv = buy_order_csv
         self.sell_order_csv = sell_order_csv
-        self.forbid_list = forbid_list
+        self.forbid_list = []
         
         self.risk_degree = 0.95
         self.stamp_duty = 0.001 #印花税率
@@ -311,12 +312,18 @@ class GenerateOrder:
         initial_position_csv_file_path = os.path.join(order_folder_name, self.position_csv)
         if os.path.exists(initial_position_csv_file_path):
             initial_position_df = pd.read_csv(initial_position_csv_file_path, index_col="code")
-            initial_position_df.index = initial_position_df.index.str.upper()        
+            initial_position_df.index = initial_position_df.index.str.upper()
             current_stock_list = list(initial_position_df.index)
         else:
             current_stock_list = []
             print("no position file, start with empty position")
             initial_position_df = pd.DataFrame(columns=["code", "amount"])
+        
+        ##获得当前累积资产
+        total_asset = self.cash
+        for index, row in initial_position_df.iterrows():
+            total_asset += row['quantity'] * row['close']
+        print("total asset: ",total_asset)
             
         # 今日已持仓股票列表，按score降序排列。若某持仓股票不在pred_score中，则该股票排在index最后。index类型
         last_tuple = (
@@ -369,7 +376,8 @@ class GenerateOrder:
                 self.cash += trade_value - trade_cost  # 估计现金累积值
 
         # 为要买入的股票每支分配的资金
-        cash_per_stock = round(self.cash * self.risk_degree / len(buy) if len(buy) > 0 else 0, 2)
+        to_be_used_cash = self.cash - total_asset*( 1 - self.risk_degree)
+        cash_per_stock = round(to_be_used_cash / len(buy) if len(buy) > 0 else 0, 2)
         
         # 买入操作
         buy_order_file_path = os.path.join(order_folder_name, self.buy_order_csv)
@@ -409,7 +417,7 @@ if __name__ == "__main__":
     g.generate_order_csv()
     
 # cd /home/godlike/project/GoldSparrow    
-# wget https://github.com/chenditc/investment_data/releases/download/2024-11-11/qlib_bin.tar.gz
+# wget https://github.com/chenditc/investment_data/releases/download/2024-11-13/qlib_bin.tar.gz
 # 
 # tar -zxvf qlib_bin.tar.gz --strip-components=1
     
