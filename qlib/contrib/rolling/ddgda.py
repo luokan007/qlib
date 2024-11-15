@@ -240,7 +240,7 @@ class DDGDA(Rolling):
         sim_task = replace_task_handler_with_cache(sim_task, self.working_dir)
 
         if self.sim_task_model == "gbdt":
-            sim_task["model"].setdefault("kwargs", {}).update({"early_stopping_rounds": None, "num_boost_round": 150})
+            sim_task["model"].setdefault("kwargs", {}).update({"early_stopping_rounds": 10, "num_boost_round": 150})
 
         exp_name_sim = f"data_sim_s{self.step}"
 
@@ -263,7 +263,7 @@ class DDGDA(Rolling):
         #   But please select a right time to make sure the finnal rolling tasks are not leaked in the training data.
         # - The test_start is automatically aligned to the next day of test_end.  Validation is ignored.
         train_start = "2008-01-01" if self.train_start is None else self.train_start
-        train_end = "2010-12-31" if self.meta_1st_train_end is None else self.meta_1st_train_end
+        train_end = "2014-12-31" if self.meta_1st_train_end is None else self.meta_1st_train_end
         test_start = (pd.Timestamp(train_end) + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
         proxy_forecast_model_task = {
             # "model": "qlib.contrib.model.linear.LinearModel",
