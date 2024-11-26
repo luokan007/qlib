@@ -299,7 +299,7 @@ class SBBStrategyEMA(SBBStrategyBase):
     (S)elect the (B)etter one among every two adjacent trading (B)ars to sell or buy with (EMA) signal.
     """
 
-    # TODO:
+    # TODO: 
     # 1. Supporting leverage the get_range_limit result from the decision
     # 2. Supporting alter_outer_trade_decision
     # 3. Supporting checking the availability of trade decision

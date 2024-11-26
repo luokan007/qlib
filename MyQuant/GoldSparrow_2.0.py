@@ -417,7 +417,7 @@ if __name__ == "__main__":
     g.generate_order_csv()
     
 # cd /home/godlike/project/GoldSparrow    
-# wget https://github.com/chenditc/investment_data/releases/download/2024-11-14/qlib_bin.tar.gz
+# wget https://github.com/chenditc/investment_data/releases/download/2024-11-25/qlib_bin.tar.gz
 # 
 # tar -zxvf qlib_bin.tar.gz --strip-components=1
     
