@@ -29,7 +29,7 @@ from qlib.data import D # 基础行情数据服务的对象
 
 global_config = {
     "qlib_init": {
-        "provider_uri":  "/home/godlike/project/data/cn_data"  # 原始行情数据存放目录
+        "provider_uri":  "/home/godlike/project/GoldSparrow/Updated_Stock_Data"  # 原始行情数据存放目录
     },
     "market": 'csi300',  # 股票池
     "benchmark": "SH000300", # 基准：沪深300指数
@@ -38,7 +38,7 @@ global_config = {
     "valid_start": "2021-01-01", 
     "valid_end": "2022-12-31", # 验证集
     "test_start": "2023-01-01", 
-    "test_end": "2024-10-15",  # 测试集
+    "test_end": "2024-10-30",  # 测试集
     "dataset_pickle_path": "~/project/qlib/qlib/experiment_data/dataset.1.10.pkl",
     "train_model_pickle_path":"~/project/qlib/qlib/experiment_data/train_model.1.10.pkl",
     "qs_report_file_path":"~/project/qlib/qlib/experiment_data/qs_report.1.10.html"
@@ -263,7 +263,7 @@ def process_data():
     start_time = global_config["train_start"]
     end_time = global_config["test_end"]
     fit_start_time = global_config["train_start"]
-    fit_end_time = global_config["train_end"]
+    fit_end_time = global_config["valid_end"]
     
     train_start = global_config["train_start"]
     train_end = global_config["train_end"]

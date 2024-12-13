@@ -2,6 +2,8 @@
 # updated: 2024.10.24
 # change log:
 #   - 支持LSTM
+#   - 支持打印订单详情：
+#       https://github.com/microsoft/qlib/issues/385
 
 
 import pickle
@@ -29,7 +31,7 @@ from qlib.data import D # 基础行情数据服务的对象
 
 global_config = {
     "qlib_init": {
-        "provider_uri":  "/home/godlike/project/data/cn_data"  # 原始行情数据存放目录
+        "provider_uri":  "/home/godlike/project/GoldSparrow/Updated_Stock_Data"  # 原始行情数据存放目录
     },
     "market": 'csi300',  # 股票池
     "benchmark": "SH000300", # 基准：沪深300指数
@@ -38,7 +40,7 @@ global_config = {
     "valid_start": "2021-01-01", 
     "valid_end": "2022-12-31", # 验证集
     "test_start": "2023-01-01", 
-    "test_end": "2024-10-15",  # 测试集
+    "test_end": "2024-11-30",  # 测试集
     "dataset_pickle_path": "~/project/qlib/qlib/experiment_data/dataset.pkl",
     "train_model_pickle_path":"~/project/qlib/qlib/experiment_data/train_model.pkl",
     "qs_report_file_path":"~/project/qlib/qlib/experiment_data/qs_report.html"
@@ -61,13 +63,13 @@ def training_process(dataset):
         "module_path": "qlib.contrib.model.pytorch_lstm", 
         # 模型类超参数配置，未写的则采用默认值。 这些参数传给模型类
         "kwargs": {  # kwargs用于初始化上面的class
-             "d_feat": 158,
+             "d_feat": 360,
             "hidden_size": 64,
             "num_layers": 2,
-            "dropout": 0.2,
+            "dropout": 0,
             "n_epochs":  200,
             "lr": 1e-5,
-            "early_stop": 10,
+            "early_stop": 30,
             "batch_size": 800,
             "metric": "loss",
             "loss": "mse",
@@ -112,7 +114,7 @@ def training_process(dataset):
     print("\nTraining process Done!")
     return model
 
-def pred_backtest_process(dataset,model) -> None:
+def pred_backtest_process(dataset, model, print_detailed_order=False) -> None:
     """
      - 从pickle文件载入模型和数据文件
      - 回测
@@ -134,7 +136,7 @@ def pred_backtest_process(dataset,model) -> None:
             "kwargs": {
                 "time_per_step": FREQ,
                 "generate_portfolio_metrics": True,
-                # "verbose": True, # 是否打印订单执行记录
+                 #"verbose": True, # 是否打印订单执行记录
             },
         },    
         "strategy": { # 回测策略相关超参数配置
@@ -165,7 +167,6 @@ def pred_backtest_process(dataset,model) -> None:
                 "close_cost": 0.0015, # 平仓佣金费率
                 "min_cost": 5, # 一笔交易的最小成本
                 "trade_unit": 100, # 对应复权前的交易量为100的整数倍
-                
             },
         },
     }
@@ -191,7 +192,9 @@ def pred_backtest_process(dataset,model) -> None:
         # 回测与分析：通过组合分析记录器，在测试集上执行策略回测，并记录分析结果到多个pkl文件,
         # 保存到predict_recorder对应目录的子目录artifacts\portfolio_analysis
         pa_rec.generate()
-        
+    
+    #order_df = predict_recorder.load_objects('portfolio_analysis\order_normal.pkl') ##加载订单详情结果
+    #print(order_df.head(20))
         
     
     # label_df = predict_recorder.load_object("label.pkl") # 这个pkl文件记录的是测试集未经数据预处理的原始标签值
@@ -314,7 +317,7 @@ def process_data():
         # 数据集类的参数配置
         "kwargs": { 
             "handler": { # 数据集使用的数据处理器配置
-                "class": "Alpha158", # 数据处理器类，继承自DataHandlerLP
+                "class": "Alpha360", # 数据处理器类，继承自DataHandlerLP
                 "module_path": "qlib.contrib.data.handler", # 数据处理器类所在模块
                 "kwargs": data_handler_config, # 数据处理器参数配置
             },

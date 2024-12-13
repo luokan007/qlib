@@ -253,7 +253,7 @@ def process_data():
     start_time = global_config["train_start"]
     end_time = global_config["test_end"]
     fit_start_time = global_config["train_start"]
-    fit_end_time = global_config["train_end"]
+    fit_end_time = global_config["valid_end"]
     
     train_start = global_config["train_start"]
     train_end = global_config["train_end"]

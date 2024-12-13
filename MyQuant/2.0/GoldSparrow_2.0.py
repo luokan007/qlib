@@ -388,7 +388,17 @@ class GenerateOrder:
             for item in buy:
                 writer.writerow([item, cash_per_stock])
                 buy_order.append((item, cash_per_stock))
-
+                
+        # 更新新的持仓
+        updated_position_df = initial_position_df.drop(index=sell)
+        for stock_code, amount in buy_order:
+            assert stock_code not in updated_position_df.index
+            updated_position_df.loc[stock_code] = {'quantity': -1, 'close': -1}  ## 目前数据结构没有价格信息，待后续完善
+        
+        # 输出新的持仓文件
+        new_position_csv_file_path = os.path.join(order_folder_name, f"new_{self.position_csv}")
+        updated_position_df.to_csv(new_position_csv_file_path)
+        print(f"New position file saved to {new_position_csv_file_path}")
 
 if __name__ == "__main__":
     
@@ -420,4 +430,5 @@ if __name__ == "__main__":
 # wget https://github.com/chenditc/investment_data/releases/download/2024-11-25/qlib_bin.tar.gz
 # 
 # tar -zxvf qlib_bin.tar.gz --strip-components=1
+# 
     
