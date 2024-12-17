@@ -37,10 +37,10 @@ global_config = {
     "benchmark": "SH000300", # 基准：沪深300指数
     "train_start": "2008-01-01",
     "train_end": "2020-12-31", # 训练集
-    "valid_start": "2021-01-01", 
-    "valid_end": "2022-12-31", # 验证集
-    "test_start": "2023-01-01", 
-    "test_end": "2024-11-30",  # 测试集
+    "valid_start": "2019-01-01", 
+    "valid_end": "2020-12-31", # 验证集
+    "test_start": "2021-01-01", 
+    "test_end": "2022-12-31",  # 测试集
     "dataset_pickle_path": "~/project/qlib/qlib/experiment_data/dataset.pkl",
     "train_model_pickle_path":"~/project/qlib/qlib/experiment_data/train_model.pkl",
     "qs_report_file_path":"~/project/qlib/qlib/experiment_data/qs_report.html"
@@ -63,13 +63,13 @@ def training_process(dataset):
         "module_path": "qlib.contrib.model.pytorch_lstm", 
         # 模型类超参数配置，未写的则采用默认值。 这些参数传给模型类
         "kwargs": {  # kwargs用于初始化上面的class
-             "d_feat": 360,
+             "d_feat": 158,
             "hidden_size": 64,
             "num_layers": 2,
             "dropout": 0,
-            "n_epochs":  200,
+            "n_epochs":  20,
             "lr": 1e-5,
-            "early_stop": 30,
+            "early_stop": 5,
             "batch_size": 800,
             "metric": "loss",
             "loss": "mse",
@@ -317,7 +317,7 @@ def process_data():
         # 数据集类的参数配置
         "kwargs": { 
             "handler": { # 数据集使用的数据处理器配置
-                "class": "Alpha360", # 数据处理器类，继承自DataHandlerLP
+                "class": "Alpha158", # 数据处理器类，继承自DataHandlerLP
                 "module_path": "qlib.contrib.data.handler", # 数据处理器类所在模块
                 "kwargs": data_handler_config, # 数据处理器参数配置
             },

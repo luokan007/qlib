@@ -75,7 +75,7 @@ class TopkDropoutStrategy(bt.Strategy):
         self.market_close_time = datetime.strptime("14:55", "%H:%M")
         self.BUY_DIRECTION = 1
         self.SELL_DIRECTION = -1
-        self.RESILIANT_RATE = 0.9
+        self.RESILIANT_RATE = 0.05
         self.verbose=True
 
     def start(self):
@@ -518,7 +518,7 @@ def main(provider_uri=None, provider_day_uri=None, stock_distribution_file=None,
          start_time=start_date,
          end_time=end_date,
      ).xs('SH000300').pct_change().rename(columns={'$close': bench_symbol})
-    output = "quantstats-tearsheet_bt.html"
+    output = "quantstats-tearsheet_bt_1.2_res=0.05.html"
     qs.reports.html(
         returns, benchmark=df_bench, output=output)
 
@@ -535,10 +535,13 @@ if __name__ == "__main__":
     #       rid="7c5183bbecbc4ebd95828de1784def47"
     #       )
      
-      ##pred时间段为2023-01-01 至2024-11-30,形成结论
+      ##### pred时间段为2023-01-01 至2023-01-30,主要为了测试流程  rid: "0833139cd23a48d592f1a1c6510f8495"
+    ##### pred时间段为2023-01-01 至2024-10-30,形成结论  rid: "156de12d5bd8429882e24c11f5593a5b"
+    ### pred时间段为2023-01-01 至2024-10-30, ALSTM模型，  rid: 57c61d4d74314018abe86204df221a34
+
      main(provider_uri=r"/home/godlike/project/GoldSparrow/HighFreq_Data/Qlib_data/hs300_5min_bin",
           provider_day_uri=r"/home/godlike/project/GoldSparrow/Updated_Stock_Data",
           stock_distribution_file = r"/home/godlike/project/GoldSparrow/Meta_Data/stock_distribution_long_period.csv",
           exp_name="LSTM_CSI300_Alpha58",
-          rid="156de12d5bd8429882e24c11f5593a5b"
+          rid="0833139cd23a48d592f1a1c6510f8495"
           )

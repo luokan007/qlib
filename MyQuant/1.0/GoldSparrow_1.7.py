@@ -33,8 +33,8 @@ global_config = {
     },
     "market": 'csi300',  # 股票池
     "benchmark": "SH000300", # 基准：沪深300指数
-    "train_start": "2005-01-01",
-    "train_end": "2020-12-31", # 训练集
+    "train_start": "2008-01-01",
+    "train_end": "2022-12-31", # 训练集
     "valid_start": "2021-01-01", 
     "valid_end": "2022-12-31", # 验证集
     "test_start": "2023-01-01", 
@@ -254,7 +254,7 @@ def process_data():
     start_time = global_config["train_start"]
     end_time = global_config["test_end"]
     fit_start_time = global_config["train_start"]
-    fit_end_time = global_config["valid_end"]
+    fit_end_time = global_config["train_end"]
     
     train_start = global_config["train_start"]
     train_end = global_config["train_end"]

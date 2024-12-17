@@ -17,7 +17,7 @@ import webbrowser
 from datetime import datetime, time
 from datetime import timedelta
 
-
+import backtrader.indicators as btind
 import quantstats as qs
 import backtrader as bt
 
@@ -28,41 +28,112 @@ from qlib.data import D  # 基础行情数据服务的对象
 
 
 class Trade:
-    def __init__(self, symbol, direction, quantity):
+    """_summary_
+    """
+    def __init__(self, data, symbol, direction, quantity):
         self.symbol = symbol
         self.direction = direction
         self.quantity = quantity
-        
+        self.next_deal = quantity
+        self._total_num = 1
+        self._round = 0
+        self._base_value = quantity
+        self._remainder = 0
+        self._extra_parts = 0
+        self.data = data
+
+    def divide(self, num):
+        """_summary_
+
+        Args:
+            num (_type_): _description_
+        """
+        if num > 0:
+            self._base_value = (self.quantity // num)//100 *100
+            self._remainder = self.quantity - self._base_value*num
+            self._extra_parts = self._remainder // 100
+            self._round = 0
+            self._total_num = num
+            if self._extra_parts > 0:
+                self.next_deal = self._base_value + 100
+            else:
+                self.next_deal = self._base_value
+
+    def deal(self):
+        """执行一次交易,并更新剩余数量
+        """
+        self._round += 1
+        if self._total_num > self._round:
+            if self._extra_parts > self._round:
+                self.next_deal = self._base_value + 100
+            else:
+                self.next_deal = self._base_value
+        else:
+            self.next_deal = 0
 
 class TradeDecision:
+    """_summary_
+    """
     def __init__(self):
+        self.trade_plans = [] ##全天的交易计划
+        self.pred_schedule = {} ##执行预测任务的计划表
+        self.execution_schedule = {} ##每笔交易的计划执行表
+
+        self.time_point_index_list = [1455,955,1025,1055,1125,1325,1355,1425]
+        self.LEFT_TRADE = 0
+        self.RIGHT_TRADE = 1
+
+        self.reset()
+
+    def reset(self):
+        """_summary_
+        """
         self.trade_plans = []
+        self.pred_schedule = {}
         self.execution_schedule = {}
-
-    def add_trade_plan(self, trades):
+        
+        for index in self.time_point_index_list:
+            self.pred_schedule[index] = []
+            self.execution_schedule[index] = []
+    def add_trade(self, trade):
         """Add a list of trade plans for the next day."""
-        self.trade_plans.extend(trades)
+        self.trade_plans.append(trade)
 
-    def generate_execution_schedule(self, start_time, end_time):
-        """Generate an execution schedule every 30 minutes between start_time and end_time."""
-        current_time = start_time
-        interval = timedelta(minutes=30)
-        
-        # Initialize the schedule with empty lists
-        while current_time < end_time:
-            self.execution_schedule[current_time] = []
-            current_time += interval
-        
-        # Distribute trades evenly across the schedule
-        num_intervals = len(self.execution_schedule)
-        if num_intervals == 0:
-            return
-        
-        for i, trade in enumerate(self.trade_plans):
-            slot = i % num_intervals
-            time_slot = list(self.execution_schedule.keys())[slot]
-            self.execution_schedule[time_slot].append(trade)
+    def get_schedule(self, time_hash):
+        """_summary_
 
+        Args:
+            time_hash (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """
+        if time_hash not in self.pred_schedule:
+            return None
+        else:
+            return self.pred_schedule[time_hash]
+        
+    def generate(self):
+        """生成待预测的执行计划，将交易计划分配到不同的时间段上。"""
+        for trade in self.trade_plans:
+            if trade.quantity == 100: ##买入一手，只在开盘的时候进行预测并进行买入或卖出的操作
+                self.pred_schedule[self.time_point_index_list[0]].append(trade)
+            elif trade.quantity <=300:
+                trade.divide(2)  ##分成两份交易
+                self.pred_schedule[self.time_point_index_list[0]].append(trade)
+                self.pred_schedule[self.time_point_index_list[4]].append(trade)
+            elif trade.quantity  <= 700:
+                trade.divide(4)
+                for i in range (4):
+                    self.pred_schedule[self.time_point_index_list[i*2]].append(trade)
+            elif trade.quantity  > 700:
+                trade.divide(8)
+                for i in range(8):
+                    self.pred_schedule[self.time_point_index_list[i]].append(trade)
+            else:
+                raise ValueError("Invalid trade quantity")
+
+ 
     def execute_trades(self, current_time):
         """Execute trades based on the current time."""
         trades_to_execute = self.execution_schedule.get(current_time, [])
@@ -94,7 +165,7 @@ class StampDutyCommissionScheme(bt.CommInfoBase):
             return 0  # just in case for some reason the size is 0.
 
 class TopkDropoutStrategy(bt.Strategy):
-    params = dict(pred_df_all=None, topk=50, n_drop=5, risk_degree=0.95, trade_unit=100)
+    params = dict(pred_df_all=None, topk=50, n_drop=5, risk_degree=0.90, trade_unit=100)
 
     # 日志函数
     def log(self, txt, dt=None):
@@ -109,85 +180,199 @@ class TopkDropoutStrategy(bt.Strategy):
         self.notify_delistdays = 5  # 提前几天知道退市
         self.start_date = self.p.pred_df_all.index[0][0]
         self.end_date = self.p.pred_df_all.index[-1][0]
-        
+
         self.market_open_time = datetime.strptime("09:30", "%H:%M")
         self.market_pre_close_time = datetime.strptime("14:50", "%H:%M")
         self.market_close_time = datetime.strptime("14:55", "%H:%M")
-        
-        self.ACTION_PRED = 1
-        self.ACTION_TRADE = 2
-        
         self.DIRECTION_BUY = 3
         self.DIRECTION_SELL = 4
-        
+
         self.TREND_LONG = 5
         self.TREND_MID = 6
         self.TREND_SHORT = 7
+        self.trade_decision = TradeDecision()
+        self.delayed_trade = []
+
+        self.forbid_list = ['SZ002602','SZ002600']
+
+        self.verbose = False
+        self.trend_signal = {}
         
-        
-        self.timer = {}
+
+        ###构建EMA indicator        btind.ExponentialMovingAverage
+        stock_pool = self.getdatanames()
+        for symbol in stock_pool:
+            self.trend_signal[symbol] = None
+        for symbol in stock_pool:
+            d = self.getdatabyname(symbol)
+            ema10 = btind.EMA(d,period=10)
+            ema20 = btind.EMA(d,period=20)
+            ema_diff =  ema20 - ema10
+            self.trend_signal[symbol] = ema_diff
 
 
     def start(self):
-        ### 计算均匀划分的份数
-        self.split_number = math.floor((self.broker.getcash() * self.p.risk_degree ) / (self.p.topk*20000))
-        
-        
-        
+        pass
+
     def prenext(self):
         self.next()
 
-    def get_timer_key(self, dt):
+    def get_timer_hash(self, dt):
+        """_summary_
+
+        Args:
+            dt (datetime): 基于小时和分钟,得到相应的hash值
+
+        Returns:
+            _type_: _description_
+        """
         return dt.hour*100+dt.minute
-    
+
+    def get_side(self, trend, direction):
+        """_summary_
+            基于趋势和买入的方向决定是否是左侧交易还是右侧交易
+        Args:
+            trend (_type_): enum: TREND_LONG/TEND_SHORT/TREND_MID
+            direction (_type_): enum: DIRECTION_BUY/DIRECTION_SELL
+
+        Returns:
+            _type_: enum:  trade.LEFT_TRADE / trade.RIGHT_TRADE
+        """
+        if trend == self.TREND_LONG:
+            if direction == self.DIRECTION_BUY:
+                return self.trade_decision.LEFT_TRADE
+            elif direction == self.DIRECTION_SELL:
+                return self.trade_decision.RIGHT_TRADE
+            else:
+                raise ValueError("Invalid direction")
+        elif trend == self.TREND_SHORT:
+            if direction == self.DIRECTION_BUY:
+                return self.trade_decision.RIGHT_TRADE
+            elif direction == self.DIRECTION_SELL:
+                return self.trade_decision.LEFT_TRADE
+            else:
+                raise ValueError("Invalid direction")
+        elif trend == self.TREND_MID:
+            return self.trade_decision.LEFT_TRADE
+        else:
+            raise ValueError("Invalid trend")
+
     def get_trend(self, symbol):
         ##根据EMA10,EMA20的数值，返回涨跌趋势
-        
-    
-    
+        ret_code = -1000
+        if symbol in self.trend_signal:
+            val = self.trend_signal[symbol][0]
+            if self.verbose:
+                print(symbol,"ema10-ema20:",val)
+            
+            if val >0:
+                ret_code = self.TREND_LONG
+            elif val==0:
+                ret_code = self.TREND_MID
+            elif val <0:
+                ret_code = self.TREND_SHORT
+            else:
+                if self.verbose:
+                    print("not correct")
+        return ret_code
+
+    def do_trade(self, trade):
+        """_summary_
+
+        Args:
+            trade (_type_): _description_
+
+        Raises:
+            ValueError: _description_
+            ValueError: _description_
+        """
+        direction = trade.direction
+        if trade.next_deal > 0:
+            size = trade.next_deal
+            if direction == self.DIRECTION_BUY:
+                order = self.buy(data=trade.data, size=size)
+            elif direction == self.DIRECTION_SELL:
+                order = self.sell(data=trade.data, size=size)
+            else:
+                raise ValueError("Invalid direction")
+
+            self.order_list.append(order)
+            trade.deal()
+        else: ##剩余数量为0，不做任何操作
+            print("No deal:",trade.symbol)
+            return
+
     def next(self):
-        now = self.datetime.date(0)
-        timer_key = self.get_timer_key(now)
+        now = self.datetime.time(0)
+        timer_key = self.get_timer_hash(now)
 
-        if timer_key in self.timer:
-            action_list = self.timer[timer_key]
-            for (action,symbol, direction, amount) in action_list:
-                if action == self.ACTION_PRED:
-                    trend = self.get_trend(symbol)
-                    
-                    
-                elif action == self.ACTION_TRADE:
-                    ds
-                else:
-                    print('unhandled action', action)
-                    raise Exception('unhandled action', action)
-        
-        
+        ##执行右侧交易的清单
+        if len(self.delayed_trade) > 0:
+            for trade in self.delayed_trade:
+                self.do_trade(trade)
+            self.delayed_trade = []
 
+        ###此处有一个前提：当天最后一个交易时段执行再平衡，不能进行其他操作
+        if timer_key != 1455:
+            pred_schedule_list = self.trade_decision.get_schedule(timer_key)
+            if pred_schedule_list is not None:
+                for trade in pred_schedule_list:
+                    if trade.next_deal > 0:
+                        trend = self.get_trend(trade.symbol)
+                        side = self.get_side(trend, trade.direction)
+                        if side == self.trade_decision.LEFT_TRADE:
+                            self.do_trade(trade)
+                        elif side == self.trade_decision.RIGHT_TRADE:
+                            self.delayed_trade.append(trade)
+                        else:
+                            raise ValueError("Invalid side")
+                    else:
+                        raise ValueError("why would be here???")
         ##在当天最后一个交易时段产生明天的交易的订单
-        
+        else:
             p_list = [p for p in self.getpositions().values() if p.size != 0]
             print('num position', len(p_list))  # 持仓品种数
-            
+            if self.verbose and len(p_list) > self.p.topk:
+                print("why we got more than topk list???")
+
+            for o in self.order_list:
+                self.cancel(o)  # 取消所有未执行订
+            self.order_list = []  # 重置
+
             # 执行再平衡，生成明日的交易决策
-            trade_decision = self.rebalance_portfolio()     
+            self.trade_decision.reset()
+            self.rebalance_portfolio(self.trade_decision)
+            self.trade_decision.generate() ## 生成待预测的执行计划，同时更新trade对象中的一些关键变量
+            ###执行第一次预测，然后执行左侧或是右侧交易
+            pred_schedule_list = self.trade_decision.get_schedule(timer_key)
+            for trade in pred_schedule_list:
+                trend = self.get_trend(trade.symbol)
+                side = self.get_side(trend, trade.direction)
+                if side == self.trade_decision.LEFT_TRADE:
+                    self.do_trade(trade)
+                elif side == self.trade_decision.RIGHT_TRADE:
+                    self.delayed_trade.append(trade)
+                else:
+                    raise ValueError("Invalid side")
+
     def notify_order(self, order):
         if order.status in [order.Submitted, order.Accepted]:
             # 订单状态 submitted/accepted，无动作
             return
 
         # 订单完成
+        
         if order.status in [order.Completed]:
-            if order.isbuy():
-                self.log(
-                    f'买单执行,{bt.num2date(order.executed.dt)}, {order.data._name}, {order.executed.price}, {order.executed.size}, 创建时间 {bt.num2date(order.created.dt)}'
-                )
+            if self.verbose:
+                if order.isbuy():
+                    self.log(
+                        f'买单执行,{bt.num2date(order.executed.dt)}, {order.data._name}, {order.executed.price}, {order.executed.size}, 创建时间 {bt.num2date(order.created.dt)}'
+                    )
 
-            elif order.issell():
-                self.log(
-                    f'卖单执行,{bt.num2date(order.executed.dt)}, {order.data._name}, {order.executed.price}, {order.executed.size}, 创建时间 {bt.num2date(order.created.dt)}'
-                )
-
+                elif order.issell():
+                    self.log(
+                        f'卖单执行,{bt.num2date(order.executed.dt)}, {order.data._name}, {order.executed.price}, {order.executed.size}, 创建时间 {bt.num2date(order.created.dt)}'
+                    )
         else:
             self.log(
                 f'订单作废  {order.data._name}, {order.getstatusname()}, isbuy:{order.isbuy()}, {order.created.size}, 创建时间 {bt.num2date(order.created.dt)}'
@@ -201,6 +386,15 @@ class TopkDropoutStrategy(bt.Strategy):
                       self.broker.getvalue(), self.broker.getcash()))
 
     def get_first_n(self, li, n):
+        """_summary_
+
+        Args:
+            li (_type_): _description_
+            n (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """
         cur_n = 0
         res = []  # 结果
 
@@ -218,7 +412,6 @@ class TopkDropoutStrategy(bt.Strategy):
         return res
 
     def get_last_n(self, li, n):  # 需要平仓的股票池
-
         cur_n = 0
         res = []  # 结果
 
@@ -227,9 +420,12 @@ class TopkDropoutStrategy(bt.Strategy):
             cur_n += 1
             if cur_n >= n:
                 break
-        return res[::-1]        
-          
-    def rebalance_portfolio(self):
+        return res[::-1]
+      
+    def rebalance_portfolio(self, trade_decision):
+        """再平衡策略,基于pred的score,采用topk-dropout策略,
+        返回交易计划:trade_plan
+        """
         def will_delist(symbol):
             # 是否即将退市
             d = self.getdatabyname(symbol)
@@ -240,7 +436,7 @@ class TopkDropoutStrategy(bt.Strategy):
             else:
                 return False
 
-        forbid = [] # 其它禁止持有的股票
+        forbid = self.forbid_list # 其它禁止持有的股票
         # 取得当前日期
         curr_date = pd.to_datetime(self.datetime.date(0))
         print('curr_date=====', curr_date)
@@ -258,11 +454,11 @@ class TopkDropoutStrategy(bt.Strategy):
         current_stock_list = [
             d._name for d, p in self.getpositions().items() if p.size != 0
         ]  # 当前有持仓的股票代码集合
-        
+
         ##获得当前累积资产
         total_value = self.broker.getvalue()
         #print(f'Total asset value: {total_value}')
-        
+
 
         # 今日已持仓股票列表，index类型，已按score降序排列。若某持仓股票不在pred_score中，则该股票排在index最后。
         last = pred_score.reindex(current_stock_list).sort_values(
@@ -302,26 +498,23 @@ class TopkDropoutStrategy(bt.Strategy):
             ## 注释掉原先的逻辑，生成执行订单的计划
             #o = self.sell(data=d, size=sell_amount)
             #self.order_list.append(o)
-            sell_plan = self.get_exec_plan(sell_amount)
-            for (hour,minute,amount) in sell_plan:
-                self.insert_exec_plan(hour,minute,"sell",(d, amount))
-            
+            trade = Trade(data=d, symbol=d._name, direction=self.DIRECTION_SELL, quantity=sell_amount)
+            trade_decision.add_trade(trade)
             trade_value = d.close[0] * sell_amount  # 用今日收盘价估算明日开盘可能的成交金额
-
             trade_cost = trade_value * (
                 2 * self.broker.comminfo[None].p.commission +
                 self.broker.comminfo[None].p.stamp_duty)  # 估计交易成本
             cash += (trade_value - trade_cost)  # 估计现金累积值
         # 为要买入的股票每支分配的资金
-        #to_be_used_cash = cash - total_value*( 1 - self.p.risk_degree)
-        #cash_per_stock = round(to_be_used_cash / len(buy) if len(buy) > 0 else 0, 2)
+        to_be_used_cash = cash - total_value*( 1 - self.p.risk_degree)
+        cash_per_stock = round(to_be_used_cash / len(buy) if len(buy) > 0 else 0, 2)
 
-        cash_per_stock = cash * self.p.risk_degree / len(buy) if len(buy) > 0 else 0
+        #cash_per_stock = cash * self.p.risk_degree / len(buy) if len(buy) > 0 else 0
         # 买入操作
         for d in buy_data:
             #预先测算待买入的数量
-            target_size = math.floor(cash_per_stock / (d.close[0]*self.p.trade_unit))*self.p.trade_unit
-            
+            target_size = math.floor(cash_per_stock/(d.close[0]*self.p.trade_unit))*self.p.trade_unit
+
             if target_size == 0:
                 #如果资金允许，至少买入一手，允许其至多45%的资金量（占用闲散现金的1/5)
                 if(d.close[0]*self.p.trade_unit <= cash_per_stock*1.45):
@@ -329,22 +522,23 @@ class TopkDropoutStrategy(bt.Strategy):
                     ##注释掉原先的逻辑，生成执行订单的计划
                     #o = self.order_target_size(data=d, target=self.p.trade_unit)
                     #self.order_list.append(o)
-                    
                     ##插入一条在9：30买入一手的计划
-                    self.insert_exec_plan(9,30,"buy",(d, self.p.trade_unit))
-            
+                    #self.insert_exec_plan(9,30,"buy",(d, self.p.trade_unit))
+                    trade = Trade(data=d, symbol=d._name, direction=self.DIRECTION_BUY, quantity=self.p.trade_unit)
+                    trade_decision.add_trade(trade)
                 else:
                     print("目标股票太贵，无法买入：", d._name," 昨日收盘价：",d.close[0])
             elif target_size > 0:
                 ##注释掉原先的逻辑，生成执行订单的计划
-                #o = self.order_target_value(data=d, target=cash_per_stock)  ## 按价值买入，会用下一个开盘价买入（计入滑点）
+                #o = self.order_target_value(data=d, target=cash_per_stock)  
+                ## 按价值买入，会用下一个开盘价买入（计入滑点）
                 #self.order_list.append(o)
-                buy_plan = self.get_exec_plan(target_size)
-                for (hour,minute,amount) in buy_plan:
-                    self.insert_exec_plan(hour,minute,"buy",(d, amount))
+                trade = Trade(data=d, symbol=d._name, direction=self.DIRECTION_BUY, quantity=target_size)
+                trade_decision.add_trade(trade)
             else:
                 pass
         print("当前资产：",self.broker.getvalue(),"当前现金：", self.broker.getcash())
+
 
 def main(provider_uri=None, provider_day_uri=None, exp_name=None, rid=None, pred_score_df=None):
     ##载入qlib数据
@@ -378,11 +572,10 @@ def main(provider_uri=None, provider_day_uri=None, exp_name=None, rid=None, pred
     df_all['$high'] = df_all['$high']/df_all['$factor']
     df_all['$low'] = df_all['$low']/df_all['$factor']
     df_all['$close'] = df_all['$close']/df_all['$factor']
-    
+
     # 创建 stock_pool
     stock_pool = list(pred_df_all.index.levels[1])
-    
-    print("df_all:",df_all.head(100))
+    #print("df_all:",df_all.head(100))
     #     df_all:                     $open  $high  $low  $close   $change   $factor     $volume
     # instrument datetime                                                                         
     # SH600000   2023-01-03 09:30:00   7.27   7.28  7.22    7.23       NaN  1.386739  1.288161e+06
@@ -446,6 +639,8 @@ def main(provider_uri=None, provider_day_uri=None, exp_name=None, rid=None, pred
     # cerebro.broker.set_coc(True)  # 以订单创建日的收盘价成交
     # cerebro.broker.set_coo(True)   # 以本日开盘价成交
     starttime = datetime.now()
+    skip_count = 0
+    skip_stock_list = []
     for symbol in stock_pool:
         try:
             df = df_all.xs(symbol, level=0)
@@ -459,13 +654,13 @@ def main(provider_uri=None, provider_day_uri=None, exp_name=None, rid=None, pred
                 volume=7,  # 成交量所在列
                 openinterest=-1,  # 无未平仓量列
                 fromdate=start_date,  # 起始日
-                todate=end_date,  # 结束日 
+                todate=end_date,  # 结束日
                 plot=False)
             cerebro.adddata(data, name=symbol)
-        except KeyError as e:
-            print(f"Error: Could not find data for symbol {e}. Skipping.")
-        
-        
+        except KeyError:
+            skip_count += 1
+            skip_stock_list.append(symbol)
+    print(f"Skip stock count: {skip_count}.")
     cerebro.addstrategy(TopkDropoutStrategy, pred_df_all=pred_df_all)
     startcash = 10000000  ## 一千万初始资金
     cerebro.broker.setcash(startcash)
@@ -486,13 +681,13 @@ def main(provider_uri=None, provider_day_uri=None, exp_name=None, rid=None, pred
     returns, positions, transactions, gross_lev = portfolio_stats.get_pf_items(
     )
     returns.index = returns.index.tz_convert(None)  # 索引的时区要设置一下，否则出错
-    
+
     ##载入qlib day数据
     qlib.init(provider_uri=provider_day_uri, region="cn")
-    
+
     bench_symbol = 'SH000300'
     # 筛选 'SH600000' 并且时间为每天14:55的数据
-    
+
     df_bench = D.features(
          [bench_symbol],
          fields=['$close'],
@@ -528,7 +723,7 @@ def main(provider_uri=None, provider_day_uri=None, exp_name=None, rid=None, pred
     # #final_df.reset_index(inplace=True)
     # print(final_df)
 
-    output = "quantstats-tearsheet_bt.html"
+    output = "quantstats-tearsheet_bt_1.3.html"
     qs.reports.html(
         returns, benchmark=df_bench, output=output)
 
@@ -537,10 +732,12 @@ def main(provider_uri=None, provider_day_uri=None, exp_name=None, rid=None, pred
 
 if __name__ == "__main__":
     
-    ##### pred时间段为2023-01-01 至2023-01-15,主要为了测试流程  rid: "7c5183bbecbc4ebd95828de1784def47"
-    ##### pred时间段为2023-01-01 至2024-11-30,形成结论  rid: "156de12d5bd8429882e24c11f5593a5b"
+    ##### pred时间段为2023-01-01 至2023-01-30,主要为了测试流程  rid: "0833139cd23a48d592f1a1c6510f8495"
+    ##### pred时间段为2023-01-01 至2024-10-30,形成结论  rid: "156de12d5bd8429882e24c11f5593a5b"
+    ### pred时间段为2023-01-01 至2024-10-30, ALSTM模型，  rid: 57c61d4d74314018abe86204df221a34
+    ### pred时间段为2021-01-01 至2022-12-30, LSTM模型，  rid: 44764b171be64990bf7dc17934090faa
     main(provider_uri=r"/home/godlike/project/GoldSparrow/HighFreq_Data/Qlib_data/hs300_5min_bin",
          provider_day_uri=r"/home/godlike/project/GoldSparrow/Updated_Stock_Data",
          exp_name="LSTM_CSI300_Alpha58",
-         rid='156de12d5bd8429882e24c11f5593a5b'
+         rid='44764b171be64990bf7dc17934090faa'
          )

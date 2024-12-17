@@ -482,44 +482,13 @@ def main(provider_uri=None, provider_day_uri=None, exp_name=None, rid=None, pred
     qlib.init(provider_uri=provider_day_uri, region="cn")
     
     bench_symbol = 'SH000300'
-    # 筛选 'SH600000' 并且时间为每天14:55的数据
-    
     df_bench = D.features(
          [bench_symbol],
          fields=['$close'],
          start_time=start_date,
          end_time=end_date,
      ).xs('SH000300').pct_change().rename(columns={'$close': bench_symbol})
-    
-    # df_bench = D.features(
-    #      [bench_symbol],
-    #      fields=['$close'],
-    #      start_time=start_date,
-    #      end_time=end_date,
-    #      freq="5min")
-    
-    # # 确保 datetime 索引部分是 DatetimeIndex 类型
-    # if not isinstance(df_bench.index.levels[1], pd.DatetimeIndex):
-    #     df_bench.index = df_bench.index.set_levels(pd.to_datetime(df_bench.index.levels[1]), level=1)
-        
-    # target_time = pd.to_datetime('14:55:00').time()
-    
-    # # 提取 instrument 和 datetime 索引
-    # instrument_level = df_bench.index.get_level_values('instrument')
-    # datetime_level = df_bench.index.get_level_values('datetime')
-    
-    # # 构建布尔掩码
-    # mask = (instrument_level == bench_symbol) & (datetime_level.time == target_time)
-
-    # filtered_df = df_bench.loc[mask]
-
-    # # 只保留 'close' 列
-    # final_df = filtered_df[['$close']].copy()
-    # # 重置索引（可选）
-    # #final_df.reset_index(inplace=True)
-    # print(final_df)
-
-    output = "quantstats-tearsheet_bt.html"
+    output = "quantstats-tearsheet_bt_1.1.html"
     qs.reports.html(
         returns, benchmark=df_bench, output=output)
 
@@ -528,10 +497,11 @@ def main(provider_uri=None, provider_day_uri=None, exp_name=None, rid=None, pred
 
 if __name__ == "__main__":
     
-    ##### pred时间段为2023-01-01 至2023-01-15,主要为了测试流程  rid: "7c5183bbecbc4ebd95828de1784def47"
-    ##### pred时间段为2023-01-01 至2024-11-30,形成结论  rid: "156de12d5bd8429882e24c11f5593a5b"
+    ##### pred时间段为2023-01-01 至2023-01-30,主要为了测试流程  rid: "0833139cd23a48d592f1a1c6510f8495"
+    ##### pred时间段为2023-01-01 至2024-10-30,形成结论  rid: "156de12d5bd8429882e24c11f5593a5b"
+    ### pred时间段为2023-01-01 至2024-10-30, ALSTM模型，  rid: 57c61d4d74314018abe86204df221a34
     main(provider_uri=r"/home/godlike/project/GoldSparrow/HighFreq_Data/Qlib_data/hs300_5min_bin",
          provider_day_uri=r"/home/godlike/project/GoldSparrow/Updated_Stock_Data",
          exp_name="LSTM_CSI300_Alpha58",
-         rid='156de12d5bd8429882e24c11f5593a5b'
+         rid='0833139cd23a48d592f1a1c6510f8495'
          )

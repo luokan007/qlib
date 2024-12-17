@@ -413,4 +413,4 @@ os.environ['LANG'] = 'en_US.UTF-8'
 locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
 ########
 if __name__ == "__main__":
-    main(is_process_data = False, is_train =True)
+    main(is_process_data = True, is_train =True)

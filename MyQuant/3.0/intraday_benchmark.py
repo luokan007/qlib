@@ -1,4 +1,15 @@
+# title: intraday_benchmark.py
+# updated: 2024.12.4
+# change log:
+#   - 构建基于backtrader的回测框架
+#   - 
 
+# 目标：
+#   1. 载入qlib数据，载入日频数据
+#   2. 支持backtrader框架
+#   3. 以开盘价买入
+#   4. 增加滑点、
+#   5. 改进risk_degree的计算方式
 
 
 import quantstats as qs
@@ -65,8 +76,8 @@ class TopkDropoutStrategy(bt.Strategy):
         for o in self.order_list:
             self.cancel(o)  # 取消所有未执行订
         self.order_list = []  # 重置
-        weekday = self.datetime.date(0).isoweekday()  # 今天周几
-
+        
+        #weekday = self.datetime.date(0).isoweekday()  # 今天周几
         # 每周5晚上调仓
         #if weekday != 5:
         #    return
@@ -390,6 +401,8 @@ def main(provider_uri=None, exp_name=None, rid=None, pred_score_df=None):
     df_bench = D.features(
         [bench_symbol],
         fields=['$close'],
+        start_time=start_date,
+         end_time=end_date,
     ).xs('SH000300').pct_change().rename(columns={'$close': bench_symbol})
     output = "quantstats-tearsheet_bt_benchmark.html"
     qs.reports.html(
@@ -400,7 +413,11 @@ def main(provider_uri=None, exp_name=None, rid=None, pred_score_df=None):
     print('耗时',datetime.now()-starttime)
 
 if __name__ == "__main__":
+    ##### pred时间段为2023-01-01 至2023-01-30,主要为了测试流程  rid: "0833139cd23a48d592f1a1c6510f8495"
+    ##### pred时间段为2023-01-01 至2024-10-30,形成结论  rid: "156de12d5bd8429882e24c11f5593a5b"
+    ### pred时间段为2023-01-01 至2024-10-30, ALSTM模型，  rid: 57c61d4d74314018abe86204df221a34
+
     main(provider_uri=r"/home/godlike/project/GoldSparrow/Updated_Stock_Data",
          exp_name="LSTM_CSI300_Alpha58",
-         rid="156de12d5bd8429882e24c11f5593a5b" ##"7c5183bbecbc4ebd95828de1784def47"
+         rid="0833139cd23a48d592f1a1c6510f8495" ##"7c5183bbecbc4ebd95828de1784def47"
          )
