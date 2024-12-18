@@ -65,7 +65,8 @@ class DataManager:
 
     @classmethod
     def _login_baostock(cls) -> None:
-        with open(os.devnull, "w") as devnull:with redirect_stdout(devnull):
+        with open(os.devnull, "w") as devnull:
+            with redirect_stdout(devnull):
                 bs.login()
 
     @property
