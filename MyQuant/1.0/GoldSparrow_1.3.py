@@ -37,10 +37,10 @@ global_config = {
     "benchmark": "SH000300", # 基准：沪深300指数
     "train_start": "2008-01-01",
     "train_end": "2020-12-31", # 训练集
-    "valid_start": "2019-01-01", 
-    "valid_end": "2020-12-31", # 验证集
-    "test_start": "2021-01-01", 
-    "test_end": "2022-12-31",  # 测试集
+    "valid_start": "2021-01-01", 
+    "valid_end": "2022-12-31", # 验证集
+    "test_start": "2023-01-01", 
+    "test_end": "2024-10-31",  # 测试集
     "dataset_pickle_path": "~/project/qlib/qlib/experiment_data/dataset.pkl",
     "train_model_pickle_path":"~/project/qlib/qlib/experiment_data/train_model.pkl",
     "qs_report_file_path":"~/project/qlib/qlib/experiment_data/qs_report.html"

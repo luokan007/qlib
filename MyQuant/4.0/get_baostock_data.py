@@ -9,11 +9,10 @@
 
 import os
 import shutil
-import time
 import datetime
 from pathlib import Path
 from contextlib import redirect_stdout
-from typing import List, Optional
+from typing import Tuple, List, Dict, Optional
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 from tqdm import tqdm
@@ -235,120 +234,267 @@ class DataManager:
             )
         return self._adjust_factors.xs(code, level="code").astype(float)  # type: ignore
 
+    def _check_csv_data(self, code: str) -> Tuple[bool, bool, pd.DataFrame]:
+        """
+        检查CSV文件是否存在且包含所需数据
+        Returns:
+            Tuple[bool, bool, pd.DataFrame]: 
+            - 第一个bool表示是否包含日频数据
+            - 第二个bool表示是否包含估值数据
+            - DataFrame为读取的数据
+        """
+        file_path = Path(self._csv_path) / f"{code}.csv"
+        if not file_path.exists():
+            return False, False, None
+            
+        try:
+            df = pd.read_csv(file_path, index_col=0)
+            df.index = pd.to_datetime(df.index)
+            
+            # 检查日期范围
+            if not (df.index.min().strftime('%Y-%m-%d') <= self._start_date and
+                    df.index.max().strftime('%Y-%m-%d') >= self._end_date):
+                return False, False, None
+                
+            # 检查日频数据列
+            daily_columns = ["date","open","high","low","close",
+                             "preclose","volume","amount","turn",
+                             "tradestatus","pctChg","isST"]
+            has_daily = all(col in df.columns for col in daily_columns)
+            
+            # 检查估值数据列
+            valuation_columns = ['peTTM', 'pbMRQ', 'psTTM', 'pcfNcfTTM']
+            has_valuation = all(col in df.columns for col in valuation_columns)
+            
+            return has_daily, has_valuation, df
+        except Exception as e:
+            return False, False, None
+
+    def _download_daily_data(self, code: str) -> pd.DataFrame:
+        """下载日频数据"""
+        fields = "date,open,high,low,close,preclose,volume,amount,turn,tradestatus,pctChg,isST"
+        rs = bs.query_history_k_data_plus(
+            code, fields, start_date=self._start_date, end_date=self._end_date, adjustflag=self._adjustflag,
+        )
+        return self._result_to_data_frame(rs)
+
+    def _download_valuation_data(self, code: str) -> pd.DataFrame:
+        """下载估值数据"""
+        fields = "date,peTTM,pbMRQ,psTTM,pcfNcfTTM"
+        rs = bs.query_history_k_data_plus(
+            code, fields, start_date=self._start_date, end_date=self._end_date, adjustflag=self._adjustflag,
+        )
+        return self._result_to_data_frame(rs)
+
+    def _download_seasonal_data(self, code: str) -> pd.DataFrame:
+        """下载季度财务数据"""
+        start_year = int(self._start_date.split('-')[0])
+        end_year = int(self._end_date.split('-')[0]) if self._end_date else datetime.datetime.now().year
+
+        # Start from previous year to ensure data for early dates
+        profit_list = []
+        for year in range(start_year - 1, end_year + 1):
+            for quarter in range(1, 5):
+                rs = bs.query_profit_data(code=code, year=year, quarter=quarter)
+            
+                while (rs.error_code == '0') and rs.next():
+                    profit_list.append(rs.get_row_data())
+
+        if not profit_list:
+            return pd.DataFrame()
+            
+        return pd.DataFrame(profit_list, columns=rs.fields)
+
+    def _download_performance_data(self, code: str) -> pd.DataFrame:
+        """下载业绩快报数据"""
+        start_date = (pd.to_datetime(self._start_date) - pd.DateOffset(years=1)).strftime('%Y-%m-%d')
+
+        rs = bs.query_performance_express_report(
+            code=code,
+            start_date=start_date,
+            end_date=self._end_date
+        )
+
+        result_list = []
+        while (rs.error_code == '0') and rs.next():
+            result_list.append(rs.get_row_data())
+
+        if not result_list:
+            return pd.DataFrame()
+
+        df = pd.DataFrame(result_list, columns=rs.fields)
+
+        numeric_columns = [
+            'performanceExpressTotalAsset',
+            'performanceExpressNetAsset',
+            'performanceExpressEPSChgPct',
+            'performanceExpressROEWa',
+            'performanceExpressEPSDiluted',
+            'performanceExpressGRYOY',
+            'performanceExpressOPYOY'
+        ]
+
+        # 重命名日期列并设置为索引
+        df = df[['performanceExpPubDate'] + numeric_columns]
+        df = df.rename(columns={'performanceExpPubDate': 'date'})
+        df['date'] = pd.to_datetime(df['date'])
+        df = df.set_index('date')
+
+        # 转换数值类型
+        for col in numeric_columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+
+        return df
+
+    def _convert_performance_to_daily(self, performance_df: pd.DataFrame) -> pd.DataFrame:
+        """将业绩快报数据转换为日频数据"""
+        if performance_df.empty:
+            return performance_df
+            
+        # 重采样为日频数据并前向填充
+        daily_df = performance_df.resample('D').ffill()
+        return daily_df
+
+
+    def _convert_seasonal_to_daily(self, seasonal_df: pd.DataFrame) -> pd.DataFrame:
+        """将季度数据转换为日频数据"""
+        seasonal_df['date'] = pd.to_datetime(seasonal_df['pubDate'])
+        seasonal_df.set_index('date', inplace=True)
+
+        # 选择需要的财务指标列
+        financial_columns = ['epsTTM', 'totalShare', 'liqaShare']
+        seasonal_df = seasonal_df[financial_columns]
+        seasonal_df.index = pd.to_datetime(seasonal_df.index)
+        try:
+            seasonal_df = seasonal_df[~seasonal_df.index.duplicated()].resample('D').ffill()  # Remove duplicates before resampling
+        except Exception as e:
+            print(f"Failed to resample seasonal data: {e}")
+            return pd.DataFrame()
+
+        return seasonal_df
+
     def _process_stock_data(self, code: str, data: pd.Series) -> None:
         """Process stock data for a given code: download daily data, valuation data, and merge them."""
         self._login_baostock()
 
-        # Step 1: Download daily data
-        fields_str = ",".join(self._fields)
-        numeric_fields = self._fields.copy()
-        numeric_fields.pop(0)
+        has_daily, has_valuation, existing_df = self._check_csv_data(code)
 
-        query = bs.query_history_k_data_plus(
-            code,
-            fields_str,
-            start_date=data["ipoDate"] if self._start_date is None else self._start_date,
-            end_date=self._end_date,
-            adjustflag=self._adjustflag,
-        )
-        adj = self._adjust_factors_for(code)  # 获取复权因子
-        df_daily = query.get_data()
+        # 1. 处理日频数据
+        if not has_daily:
+            df_daily = self._download_daily_data(code)
+            
+            if df_daily is None or df_daily.empty:
+                return
+        else:
+            df_daily = existing_df
 
-        if df_daily.empty:
-            print(f"No daily data for {code}")
-            return
-
-        df_daily = df_daily[df_daily.tradestatus == "1"]  # 筛出未停牌的记录
-        df_daily = df_daily.join(adj, on="date", how="left")
-        df_daily[self._adjust_columns] = (
-            df_daily[self._adjust_columns].fillna(method="ffill").fillna(1.0)
-        )  # 复权因子列，前后因子都有
-        df_daily[numeric_fields] = df_daily[numeric_fields].replace("", "0.").astype(float)
         df_daily = df_daily.set_index("date")
 
-        df_daily["factor"] = (
-            df_daily["backAdjustFactor"]
-            if self._adjustflag == "1"
-            else df_daily["foreAdjustFactor"]
-        )
-        df_daily["volume"] /= df_daily["factor"]
-        df_daily["vwap"] = df_daily["amount"] / df_daily["volume"]
-        
-        time.sleep(1) ## rest for 1 second to avoid rate limit
-
-        # Step 2: Download valuation data
-        valuation_fields_str = ",".join(["date", "peTTM", "psTTM", "pcfNcfTTM", "pbMRQ"])
-        query_valuation = bs.query_history_k_data_plus(
-            code,
-            valuation_fields_str,
-            start_date=self._start_date if self._start_date is not None else "1990-01-01",
-            end_date=self._end_date,
-            adjustflag=self._adjustflag
-        )
-        df_valuation = query_valuation.get_data()
-
-        if df_valuation.empty:
-            print(f"No valuation data for {code}")
-            df_valuation = pd.DataFrame(columns=["date", "code", "peTTM", "psTTM", "pcfNcfTTM", "pbMRQ"])
-        else:
-            df_valuation = df_valuation[df_valuation["code"] == code]
+        # 2. 处理估值数据
+        if not has_valuation:
+            df_valuation = self._download_valuation_data(code)
+            if df_valuation.empty:
+                df_valuation = pd.DataFrame(columns=["date", "code", "peTTM", "psTTM", "pcfNcfTTM", "pbMRQ"])
+                
             df_valuation = df_valuation.set_index("date")
+            merged_df = pd.merge(df_daily, df_valuation, how='left', left_index=True, right_index=True)
+            merged_df = merged_df.loc[:, ~merged_df.columns.duplicated()]  # Remove duplicate columns
+        else:
+            merged_df = df_daily
+        
+        # Ensure all valuation columns are present and fill NaNs with 0
+        for col in ['peTTM', 'psTTM', 'pcfNcfTTM', 'pbMRQ']:
+            if col not in merged_df.columns:
+                merged_df[col] = 0
+            else:
+                merged_df[col].fillna(0, inplace=True)
 
-        # Step 3: Merge daily and valuation data
-        merged_df = pd.merge(df_daily, df_valuation, how='left', left_index=True, right_index=True)
-        merged_df = merged_df.loc[:, ~merged_df.columns.duplicated()]  # Remove duplicate columns
+        daily_columns =["open","high","low","close",
+                        "preclose","volume","amount",
+                        "turn","tradestatus","pctChg","isST"]
+        valuation_columns = ['peTTM', 'pbMRQ', 'psTTM', 'pcfNcfTTM']
 
-        # Step 4: Save the merged data to CSV
-        csv_file_path = f"{self._csv_path}/{code[:2].lower()}{code[-6:]}.csv"
-        merged_df.to_csv(csv_file_path)
+        merged_df[daily_columns] = merged_df[daily_columns].replace("", "0.").astype(float)
+        merged_df[valuation_columns] = merged_df[valuation_columns].replace("", "0.").astype(float)
 
-    def _download_stock_data_job(self, code: str, data: pd.Series) -> None:
-        fields_str = ",".join(self._fields)
-        numeric_fields = self._fields.copy()
-        numeric_fields.pop(0)
-
-        self._login_baostock()
-        # 获取复权数据
-        query = bs.query_history_k_data_plus(
-            code,
-            fields_str,
-            start_date=data["ipoDate"]
-            if self._start_date is None
-            else self._start_date,
-            end_date=self._end_date,
-            adjustflag=self._adjustflag,
-        )
-        #  adjustflag：复权类型，
-        # 3: 默认不复权；
-        # 1：后复权；
-        # 2：前复权。已支持分钟线、日线、周线、月线前后复权。 BaoStock提供的是涨跌幅复权算法复权因子，具体介绍见：复权因子简介或者BaoStock复权因子简介。
         adj = self._adjust_factors_for(code)  # 获取复权因子
-        df = query.get_data()
-        print(df.head())
-        if df.empty:
-            print(code,"is empty")
-            return
-        df = df[df.tradestatus == "1"]  # 筛出未停牌的记录
 
-        df = df.join(adj, on="date", how="left")
-        df[self._adjust_columns] = (
-            df[self._adjust_columns].fillna(method="ffill").fillna(1.0)
-        )  # 复权因子列，前后因子都有
-        df[numeric_fields] = df[numeric_fields].replace("", "0.").astype(float)
-        df = df.set_index("date")
+        merged_df = merged_df[merged_df.tradestatus == 1]  # 筛出未停牌的记录
+        merged_df = merged_df.join(adj, on="date", how="left")
+        merged_df[self._adjust_columns] = (
+            merged_df[self._adjust_columns].fillna(method="ffill").fillna(1.0))  # 复权因子列，前后因子都有
 
-        df["factor"] = (
-            df["backAdjustFactor"]
+
+        merged_df["factor"] = (
+            merged_df["backAdjustFactor"]
             if self._adjustflag == "1"
-            else df["foreAdjustFactor"]
+            else merged_df["foreAdjustFactor"]
         )
-        df["volume"] /= df["factor"]
-        df["vwap"] = df["amount"] / df["volume"]
+        merged_df["volume"] /= merged_df["factor"]
+        merged_df["vwap"] = merged_df["amount"] / merged_df["volume"]
 
-        df.to_csv(
-            f"{self._csv_path}/{code[:2].lower()}{code[-6:]}.csv"
-        )  # 保存的csv文件代码不带.,类似sh600000.csv
+        # 4. 下载并合并季度数据
+        seasonal_columns = ['epsTTM', 'totalShare', 'liqaShare']
+        seasonal_df = self._download_seasonal_data(code)
+        if seasonal_df is not None and not seasonal_df.empty:
+            # 将季度数据转换为日频
+            seasonal_df = self._convert_seasonal_to_daily(seasonal_df)
+            try:
+                merged_df.index = pd.to_datetime(merged_df.index)
+                seasonal_df.index = pd.to_datetime(seasonal_df.index)
+                merged_df = pd.merge(merged_df, seasonal_df, how='left', left_index=True, right_index=True)
+                merged_df[seasonal_columns] = merged_df[seasonal_columns].fillna(method='ffill').fillna(0)
+            except Exception as e:
+                print(f"Failed to merge seasonal data for {code}: {e}")
+        else:
+            seasonal_df = pd.DataFrame(columns=['date', 'epsTTM', 'totalShare', 'liqaShare'])
+            seasonal_df = seasonal_df.set_index("date")
+            merged_df = pd.merge(merged_df, seasonal_df, how='left', left_index=True, right_index=True)
+            merged_df[seasonal_columns] = merged_df[seasonal_columns].fillna(0)
+        
+        #merged_df[seasonal_columns] = merged_df[seasonal_columns].replace("", "0.").astype(float)
+        
+        # # 5. 下载并合并业绩快报数据————目前还有问题，暂时搁置
+        # performance_df = self._download_performance_data(code)
+        # # Add performance data handling for empty/None cases first
+        # performance_columns = ['performanceExpressTotalAsset',
+        #                         'performanceExpressNetAsset',
+        #                         'performanceExpressEPSChgPct',                                'performanceExpressROEWa',
+        #                         'performanceExpressEPSDiluted',
+        #                         'performanceExpressGRYOY',
+        #                         'performanceExpressOPYOY']
+        # if performance_df is None or performance_df.empty:
+        #     # Create empty DataFrame with required columns filled with 0
+        #     performance_df = pd.DataFrame( 0, index=merged_df.index, columns=performance_columns)
+        # else:
+        #     performance_df = self._convert_performance_to_daily(performance_df)
+            
+        # try:
+        #     merged_df = pd.merge(merged_df, performance_df,
+        #                how='left',
+        #                left_index=True,
+        #                right_index=True)
+        #     # Ensure all performance columns exist and fill NaNs with 0
+        #     for col in performance_columns:
+        #         if col not in merged_df.columns:
+        #             merged_df[col] = 0
+        #         else:
+        #             merged_df[col] = merged_df[col].fillna(method='ffill').fillna(0)
+        # except Exception as e:
+        #     print(f"Failed to merge performance data for {code}: {e}")
+        #     # Add missing columns with 0s if merge fails
+        #     for col in performance_columns:
+        #         if col not in merged_df.columns:
+        #             merged_df[col] = 0
 
+        # Step 6: Save the merged data to CSV
+        csv_file_path = f"{self._csv_path}/{code[:2].lower()}{code[-6:]}.csv"
+        try:
+            merged_df.to_csv(csv_file_path)
+        except Exception as e:
+            print(f"Failed to save data for {code}: {e}")
+
+        #bs.logout()
     def _download_stock_data(self) -> None:
         print("Download stock data")
         os.makedirs(f"{self._csv_path}", exist_ok=True)
@@ -363,15 +509,18 @@ class DataManager:
         # print([code for code, data in self._basic_info.iterrows() if code not in self._code_downloaded ])
 
         # 多线程下载
-        # code=code,	data= code_name	ipoDate	outDate	type	status
+        #code=code,	data= code_name	ipoDate	outDate	type	status
         self._parallel_foreach(
-            self._process_stock_data,
-            [
-                dict(code=code, data=data)
-                for code, data in self._basic_info.iterrows()
-                if code not in self._code_downloaded
-            ],
-        )
+             self._process_stock_data,
+             [
+                 dict(code=code, data=data)
+                 for code, data in self._basic_info.iterrows()
+                 if code not in self._code_downloaded
+             ],
+         )
+        #for code, data in self._basic_info.iterrows():
+        #    if code not in self._code_downloaded:
+        #        self._process_stock_data(code,data)
         
       
 
@@ -456,12 +605,9 @@ class DataManager:
 
         self._dump_qlib_data()
 
-    def init(
-        self,
-        use_cached_basic_info: bool = False,
-        use_cached_adjust_factor: bool = False,
-        stock_list: list = [],
-    ):
+    def init(self, use_cached_basic_info: bool = False, use_cached_adjust_factor: bool = False, stock_list: list = None):
+        if stock_list is None:
+            stock_list = []
         # 获取活跃股票代码列表合并指数代码列表，放到列表self._all_a_shares
         self._all_a_shares = stock_list
         if use_cached_basic_info:
@@ -487,18 +633,18 @@ if __name__ == "__main__":
     print(f"today: {today}")
 
     dm = DataManager(
-        csv_path=r"/home/godlike/project/GoldSparrow/Day_Data/Raw",
-        qlib_data_path=r"/home/godlike/project/GoldSparrow/Day_Data/qlib_data",
-        start_date="2024-12-01",  # 下载数据开始日期，格式如"2015-01-01" ，None从上市日开始
-        end_date=None,  # 下载数据的结束日期。None则到最近日
+        csv_path=r"/home/godlike/project/GoldSparrow/Day_Data/Day_data/Raw",
+        qlib_data_path=r"/home/godlike/project/GoldSparrow/Day_Data/Day_data/qlib_data",
+        start_date="2008-01-01",  # 下载数据开始日期，格式如"2015-01-01" ，None从上市日开始
+        end_date="2024-12-20",  # 下载数据的结束日期。None则到最近日
         #  adjustflag：复权方式，字符串."3": 不复权；"1"：后复权；"2"：前复权。
         #  BaoStock提供的是涨跌幅复权算法复权因子，具体介绍见：BaoStock复权因子简介。
         adjustflag="1",
         overwrite=True,  # 是否覆盖已存在的股票行情csv文件
-        max_workers=5,
+        max_workers=8,
     )
 
-    useCache = False  # 使用缓存股票基本信息，和调整因子。入股股票代码中的代码在缓存基本信息中不存在，则不会下载其行情数据
+    useCache = True  # 使用缓存股票基本信息，和调整因子。入股股票代码中的代码在缓存基本信息中不存在，则不会下载其行情数据
     dm.fetch_and_save_data(
         use_cached_basic_info=useCache, use_cached_adjust_factor=useCache
     )
