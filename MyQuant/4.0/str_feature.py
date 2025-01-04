@@ -104,7 +104,14 @@ class STRFeature:
             sigma = self._calc_sigma(returns)
             weight = self._calc_weight(sigma, time_range)
             return self._STR_factor(weight,returns,time_range)
-    #def process_directory(self, input_dir, output_dir):
+    
+    def process_directory(self, input_dir, output_dir):
+        """_summary_
+
+        Args:
+            input_dir (_type_): _description_
+            output_dir (_type_): _description_
+        """
 
 def __test__():
     # 测试特征生成器
