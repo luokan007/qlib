@@ -635,14 +635,18 @@ if __name__ == "__main__":
 
     dm = DataManager(
         csv_path=r"/home/godlike/project/GoldSparrow/Day_Data/Day_data/Raw",
-        qlib_data_path=r"/home/godlike/project/GoldSparrow/Day_Data/Day_data/qlib_data",
+        qlib_data_path=r"/home/godlike/project/GoldSparrow/Day_Data/Day_data/qlib_data",        
+
+        # csv_path=r"/root/autodl-tmp/GoldSparrow/Day_data/Raw",
+        # qlib_data_path=r"/root/autodl-tmp/GoldSparrow/Day_data/qlib_data",
+
         start_date="2008-01-01",  # 下载数据开始日期，格式如"2015-01-01" ，None从上市日开始
         end_date="2024-12-20",  # 下载数据的结束日期。None则到最近日
         #  adjustflag：复权方式，字符串."3": 不复权；"1"：后复权；"2"：前复权。
         #  BaoStock提供的是涨跌幅复权算法复权因子，具体介绍见：BaoStock复权因子简介。
         adjustflag="1",
         overwrite=True,  # 是否覆盖已存在的股票行情csv文件
-        max_workers=8,
+        max_workers=32,
     )
 
     useCache = True  # 使用缓存股票基本信息，和调整因子。入股股票代码中的代码在缓存基本信息中不存在，则不会下载其行情数据

@@ -10,13 +10,15 @@ import talib
 from tqdm import tqdm
 
 class TALibFeature:
+    """_summary_
+    """
     def __init__(self, basic_info_path):
         """初始化特征生成器"""
         # 定义要生成的技术指标及其参数
         self.feature_functions = {
             'EMA': {'periods': [5, 10, 20]},
             'SAR': {},
-            
+
             'RSI': {'periods': [6, 12, 24]},
             'ADX': {'timeperiod': [14,28]},
             'BOP': {},
@@ -26,45 +28,52 @@ class TALibFeature:
             'MOM': {'timeperiod': [6, 12, 24, 48]},
             'ULTOSC': {},
             'WILLR': {'timeperiod': [6, 12, 24, 48]},
-            
+
             'AD': {},
             'ADOSC': {'fastperiod': 3, 'slowperiod': 10},
             'OBV': {},
-            
+
             'ATR': {'timeperiod': [14, 28]},
             'NATR': {'timeperiod': [14, 28]},
             'TRANGE': {},
-            
+
             'TURN_RATE': {'periods': [5, 10, 20]},
             'TURN_RATE_MIX':{},
-            
+
             'BETA': {}
         }
-        
+
         self.amount_df = pd.DataFrame(columns=['date', 'amount'])
         self.index_code = "sh000300"
         self.index_df = pd.DataFrame(columns=['date', 'pctChg'])
-        
+
         self.basic_info_df = pd.read_csv(basic_info_path)
-        
+
         # 去掉code列中的点号，并转换为小写
         self.basic_info_df['code'] = self.basic_info_df['code'].str.replace('.', '').str.lower()
         # 筛选出type为1的股票代码，并转换为集合以提高查找效率
         self.stock_codes_set = set(self.basic_info_df[self.basic_info_df['type'] == 1]['code'])
-        
+
 
     def add_to_total_amount(self, df):
+        """_summary_
+
+        Args:
+            df (_type_): _description_
+        """
         target_df = df[['date', 'amount']]
         self.amount_df = pd.concat([self.amount_df, target_df], ignore_index=True)
 
     def get_total_amount(self):
+        """_summary_
+        """
         # 按日期分组并对amount列求和
         self.amount_df = self.amount_df.groupby('date')['amount'].sum().reset_index()
         # 设置'date'列为索引
         self.amount_df.set_index('date', inplace=True)
         self.amount_df.sort_index(inplace=True)
         self.amount_df["amount"] = np.log(self.amount_df['amount'])
-    
+
     def generate_slice_features(self, df):
         """新增基于横截面的特征
         - 成交量占比
@@ -97,34 +106,34 @@ class TALibFeature:
         return pd.DataFrame(columns=['volume_ratio'])
 
     def generate_single_stock_features(self, df):
-        """_summary_
-            新增更多基于ta-lib的特征
-            - Overlap Studies(重叠指标)
-                - EMA,Exponential Moving Average （指数移动平均线）
-                        //- BBANDS,Bollinger Bands （布林带）
-                - SAR,Parabolic SAR （抛物线转向）
-            - Momentum Indicators(动量指标)
-                - RSI,Relative Strength Index （相对强弱指标）
-                - ADX, Average Directional Movement Index
-                - BOP, Balance Of Power
-                - CCI, Commodity Channel Index
-                - MACD, Moving Average Convergence/Divergence
-                - MACDEXT, MACD with controllable MA type
-                - MOM,Momentum
-                - ULTOSC,Ultimate Oscillator
-                - WILLR,Williams' %R
-            - Volume Indicators(成交量指标)
-                - AD, Chaikin A/D Line
-                - ADOSC, Chaikin A/D Oscillator
-                - OBV, On Balance Volume
-            - Volatility Indicators(波动率指标)
-                - ATR, Average True Range
-                - NATR, Normalized Average True Range
-                - TRANGE, True Range
-            - Turnover Rate 换手率相关指标
-                - EMA
-                - MIX
-            - beta 指标
+        """
+        新增更多基于ta-lib的特征
+        - Overlap Studies(重叠指标)
+            - EMA,Exponential Moving Average （指数移动平均线）
+                    //- BBANDS,Bollinger Bands （布林带）
+            - SAR,Parabolic SAR （抛物线转向）
+        - Momentum Indicators(动量指标)
+            - RSI,Relative Strength Index （相对强弱指标）
+            - ADX, Average Directional Movement Index
+            - BOP, Balance Of Power
+            - CCI, Commodity Channel Index
+            - MACD, Moving Average Convergence/Divergence
+            - MACDEXT, MACD with controllable MA type
+            - MOM,Momentum
+            - ULTOSC,Ultimate Oscillator
+            - WILLR,Williams' %R
+        - Volume Indicators(成交量指标)
+            - AD, Chaikin A/D Line
+            - ADOSC, Chaikin A/D Oscillator
+            - OBV, On Balance Volume
+        - Volatility Indicators(波动率指标)
+            - ATR, Average True Range
+            - NATR, Normalized Average True Range
+            - TRANGE, True Range
+        - Turnover Rate 换手率相关指标
+            - EMA
+            - MIX
+        - beta 指标
         Args:
             df (_type_): _description_
 
@@ -133,7 +142,7 @@ class TALibFeature:
         """
 
         features = {}
-        
+
         # 确保数据列名符合预期
         open_col = 'open' if 'open' in df.columns else 'Open'
         close_col = 'close' if 'close' in df.columns else 'Close'
@@ -184,39 +193,39 @@ class TALibFeature:
 
         # ULTOSC,Ultimate Oscillator
         features['ULTOSC'] = talib.ULTOSC(df[high_col], df[low_col], df[close_col])
-        
+
         # WILLR,Williams' %R
         for period in self.feature_functions['WILLR']['timeperiod']:
             features[f'WILLR_{period}'] = talib.WILLR(df[high_col], df[low_col], df[close_col], timeperiod=period)
-        
+
         # AD, Chaikin A/D Line
         features['AD'] = talib.AD(df[high_col], df[low_col], df[close_col], df[volume_col])
-        
+
         # ADOSC, Chaikin A/D Oscillator
         features['ADOSC'] = talib.ADOSC(df[high_col], df[low_col], df[close_col], df[volume_col], 
                                         fastperiod=self.feature_functions['ADOSC']['fastperiod'], 
                                         slowperiod=self.feature_functions['ADOSC']['slowperiod'])
         # 生成OBV
         features['OBV'] = talib.OBV(df[close_col], df[volume_col])
-        
+
         # ATR, Average True Range
         for period in self.feature_functions['ATR']['timeperiod']:
             features[f'ATR_{period}'] = talib.ATR(df[high_col], df[low_col], df[close_col], timeperiod=period)
-        
+
         # NATR, Normalized Average True Range
         for period in self.feature_functions['NATR']['timeperiod']:
             features[f'NATR_{period}'] = talib.NATR(df[high_col], df[low_col], df[close_col], timeperiod=period)
-        
+
         # TRANGE, True Range
         features['TRANGE'] = talib.TRANGE(df[high_col], df[low_col], df[close_col])
-        
+
         # Turnover Rate 换手率相关指标
         for period in self.feature_functions['TURN_RATE']['periods']:
             features[f'TURN_RATE_{period}'] = talib.EMA(df[turn_col], timeperiod=period)
-        
+
         ## Turnover Rate MIX, 将日、周、月换手率的加权平均值作为新特征
         features['TURN_RATE_MIX'] = df[turn_col]*0.35 + features['TURN_RATE_5']*0.35 + features['TURN_RATE_20']*0.3
-        
+
         ## beta 指标,
         comm_dates = df.index
         aligned_index_df = self.index_df.loc[comm_dates]
@@ -236,22 +245,22 @@ class TALibFeature:
             if any(code in filename for code in self.stock_codes_set):
                 # 读取CSV文件
                 df = pd.read_csv(file_path,parse_dates=['date'])
-                
+
                 # 提取需要的列
                 df = df[['date', 'amount']]
-                
+
                 # 将当前文件的数据追加到总的结果中
                 self.add_to_total_amount(df)
-        
+
             # 检查文件名是否包含 index_code: sh000300
             if self.index_code in filename:
                 # 读取CSV文件
                 df = pd.read_csv(file_path, parse_dates=['date'])
-                
+
                 # 提取需要的列
                 self.index_df = df[['date', 'pctChg']]
                 self.index_df.set_index('date', inplace=True)
-        
+
         ##计算总成交量
         print("Calculating total amount...")
         self.get_total_amount()

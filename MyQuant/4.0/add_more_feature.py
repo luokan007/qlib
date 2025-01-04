@@ -8,7 +8,7 @@ from ta_lib_feature import TALibFeature
 from mydump_bin import DumpDataAll
 
 
-def _dump_qlib_data(csv_path, qlib_data_path, max_workers=8):
+def _dump_qlib_data(csv_path, qlib_data_path, max_workers=32):
     print("dump qlib data")
     DumpDataAll(
         csv_path= csv_path,
@@ -61,6 +61,12 @@ if __name__ == "__main__":
     merged_directory = "/home/godlike/project/GoldSparrow/Day_Data/Day_data/Merged_talib"
     qlib_directory = "/home/godlike/project/GoldSparrow/Day_Data/Day_data/qlib_data"
     basic_info_path = '/home/godlike/project/GoldSparrow/Day_Data/Day_data/qlib_data/basic_info.csv'
+    
+    # data_directory = "/root/autodl-tmp/GoldSparrow/Day_data/Raw"
+    # merged_directory = "/root/autodl-tmp/GoldSparrow/Day_data/Merged_talib"
+    # qlib_directory = "/root/autodl-tmp/GoldSparrow/Day_data/qlib_data"
+    # basic_info_path = '/root/autodl-tmp/GoldSparrow/Day_data/qlib_data/basic_info.csv'
+
     
     # Process the data
     add_features(data_directory, merged_directory,basic_info_path)
