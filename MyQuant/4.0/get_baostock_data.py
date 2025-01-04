@@ -489,10 +489,11 @@ class DataManager:
 
         # Step 6: Save the merged data to CSV
         csv_file_path = f"{self._csv_path}/{code[:2].lower()}{code[-6:]}.csv"
-        try:
-            merged_df.to_csv(csv_file_path)
-        except Exception as e:
-            print(f"Failed to save data for {code}: {e}")
+        if not merged_df.empty:
+            try:
+                merged_df.to_csv(csv_file_path)
+            except Exception as e:
+                print(f"Failed to save data for {code}: {e}")
 
         #bs.logout()
     def _download_stock_data(self) -> None:

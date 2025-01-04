@@ -1,9 +1,7 @@
 """_summary_
 """
 
-import datetime
 import shutil
-from tqdm import tqdm
 from pathlib import Path
 import pandas as pd
 from ta_lib_feature import TALibFeature
@@ -39,7 +37,7 @@ def _fix_constituents(qlib_data_path):
         df[2] = df[2].replace(latest_data, today)
         df.to_csv(p, header=False, index=False, sep="\t")
 
-def add_features(data_dir, output_dir):
+def add_features(data_dir, output_dir,basic_info_path):
     """
     Add technical analysis features to stock data using TALib
     
@@ -50,41 +48,22 @@ def add_features(data_dir, output_dir):
     output_dir : str
         Directory to save the processed files with new features
     """
-    ta_feature_generator = TALibFeature()
-    
+    ta_feature_generator = TALibFeature(basic_info_path=basic_info_path)
+
     # Create output directory if it doesn't exist
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
-    # 获取所有CSV文件列表
-    files = list(Path(data_dir).glob('*.csv'))
-
-    # 使用tqdm创建进度条
-    for file_path in tqdm(files, desc="Processing stocks", unit="file"):
-        try:
-            # 读取原始数据
-            df = pd.read_csv(file_path, index_col=0, parse_dates=True)
-            if df.empty:
-                continue
-            # 生成新特征
-            new_features = ta_feature_generator.generate_single_stock_features(df)
-
-            # 合并特征
-            result = pd.concat([df, new_features], axis=1)
-
-            # 保存结果
-            output_path = Path(output_dir) / file_path.name
-            result.to_csv(output_path)
-        except Exception as e:
-            print(f"\nError processing {file_path.name}: {str(e)}")
+    ta_feature_generator.process_directory(data_dir, output_dir)
 
 if __name__ == "__main__":
     # Define input and output directories
     data_directory = "/home/godlike/project/GoldSparrow/Day_Data/Day_data/Raw"
     merged_directory = "/home/godlike/project/GoldSparrow/Day_Data/Day_data/Merged_talib"
     qlib_directory = "/home/godlike/project/GoldSparrow/Day_Data/Day_data/qlib_data"
+    basic_info_path = '/home/godlike/project/GoldSparrow/Day_Data/Day_data/qlib_data/basic_info.csv'
     
     # Process the data
-    add_features(data_directory, merged_directory)
+    add_features(data_directory, merged_directory,basic_info_path)
     
     ##dump qlib data
     _dump_qlib_data(merged_directory, qlib_directory)
