@@ -7,25 +7,41 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import talib
-from tqdm import tqdm
+from joblib import Parallel, delayed
+from tqdm import tqdm  
+
 
 class TALibFeature:
     """_summary_
     """
-    def __init__(self, basic_info_path):
+    def __init__(self, basic_info_path,time_range = 30):
         """初始化特征生成器"""
         # 定义要生成的技术指标及其参数
+        
+        self.time_range = time_range
+        
         self.feature_functions = {
-            'EMA': {'periods': [5, 10, 20]},
+            'EMA': {'timeperiod': [5, 10, 20]},
             'SAR': {},
+            'KAMA': {'timeperiod': [12, 24, 48]},
+            'TEMA': {'timeperiod': [12, 24, 48]},
+            'TRIMA': {'timeperiod': [12, 24, 48]},
 
-            'RSI': {'periods': [6, 12, 24]},
             'ADX': {'timeperiod': [14,28]},
+            'APO ': {},
+            'AROON': {'timeperiod': [14,28]},
             'BOP': {},
             'CCI': {'timeperiod': [14,28]},
+            'CMO': {'timeperiod': [14,28]},
             'MACD': {'fastperiod': 12, 'slowperiod': 26, 'signalperiod': 9},
             'MACDEXT': {},
             'MOM': {'timeperiod': [6, 12, 24, 48]},
+            'MFI': {'timeperiod': [6, 12, 24, 48]},
+            'ROC': {'timeperiod': [6, 12, 24, 48]},
+            'RSI': {'timeperiod': [6, 12, 24]},
+            'STOCHF': {},
+            'STOCHRSI': {},
+            'TRIX': {'timeperiod': [12, 24, 48]},
             'ULTOSC': {},
             'WILLR': {'timeperiod': [6, 12, 24, 48]},
 
@@ -37,13 +53,17 @@ class TALibFeature:
             'NATR': {'timeperiod': [14, 28]},
             'TRANGE': {},
 
-            'TURN_RATE': {'periods': [5, 10, 20]},
+            'TURN_RATE': {'timeperiod': [5, 10, 20]},
             'TURN_RATE_MIX':{},
+            'TURN_RATE_ROC':{'timeperiod': [6, 12, 24, 48]},
 
             'BETA': {}
         }
 
-        self.amount_df = pd.DataFrame(columns=['date', 'amount'])
+        self.minimum_data_length = 200 # 最小数据长度,去除交易时间过短的数据，200约为一年的时长
+
+        self.median_df = pd.DataFrame()
+        self.amount_df = pd.DataFrame()
         self.index_code = "sh000300"
         self.index_df = pd.DataFrame(columns=['date', 'pctChg'])
 
@@ -54,56 +74,199 @@ class TALibFeature:
         # 筛选出type为1的股票代码，并转换为集合以提高查找效率
         self.stock_codes_set = set(self.basic_info_df[self.basic_info_df['type'] == 1]['code'])
 
+        self.stock_slice_df = pd.DataFrame()
+        self._str_factor_df = pd.DataFrame()
+        
 
-    def add_to_total_amount(self, df):
+
+    def _create_stock_slice_df(self, stock_data):
+        """创建包含日期、代码、涨跌幅和成交量的数据框"""
+        print("Creating stock slice DataFrame...")
+        dataframes = []
+        for file_name, df in stock_data.items():
+            if not df.empty and len(df) >= self.minimum_data_length:
+                code = file_name.split('.')[0]
+                df_reset = df.reset_index()
+                df_reset['code'] = code
+                dataframes.append(df_reset[['date', 'code', 'pctChg', 'amount']])
+        self.stock_slice_df = pd.concat(dataframes).set_index(['date', 'code']).sort_index()
+
+    def pre_process_slice_features(self,stock_data):
+        """计算每只股票在每天成交额的占比"""
+        self._create_stock_slice_df(stock_data)
+
+        self.amount_df['amount'] = self.stock_slice_df.groupby(level='date')['amount'].sum()
+        #print(self.amount_df)
+
+        ##计算STR凸显性因子
+        return_df = pd.DataFrame()
+        return_df['pctChg'] = self.stock_slice_df['pctChg']
+        # 将 'code' 转换为列，使得每个 'code' 都有一列
+        pivot_return_df = return_df.unstack(level='code')
+        print("generate STR factors...")
+        # 使用新的优化函数来计算每天的STR因子
+        self._str_factor_df = self.calculate_daily_str_factors(pivot_return_df)
+        #print(_str_factor_df)
+        #                       pctChg                                                                                                                                           
+        # code        sz002090  sz002091  sz002092  sz002093  sz002094  sz002095  sz002096 sz002097  sz002098  sz002099  sz002100  sz002101  sz002102  sz002103  sz002104
+        # date                                                                                                                                                           
+        # 2008-01-02       NaN       NaN       NaN       NaN       NaN       NaN       NaN      NaN       NaN       NaN       NaN       NaN       NaN       NaN       NaN
+        # 2008-01-03       NaN       NaN       NaN       NaN       NaN       NaN       NaN      NaN       NaN       NaN       NaN       NaN       NaN       NaN       NaN
+        # 2008-01-04       NaN       NaN       NaN       NaN       NaN       NaN       NaN      NaN       NaN       NaN       NaN       NaN       NaN       NaN       NaN
+        # 2008-01-07       NaN       NaN       NaN       NaN       NaN       NaN       NaN      NaN       NaN       NaN       NaN       NaN       NaN       NaN       NaN
+        # 2008-01-08       NaN       NaN       NaN       NaN       NaN       NaN       NaN      NaN       NaN       NaN       NaN       NaN       NaN       NaN       NaN
+        # 2008-01-09       NaN       NaN       NaN       NaN       NaN       NaN       NaN      NaN       NaN       NaN       NaN       NaN       NaN       NaN       NaN
+        # 2008-01-10  0.226865 -1.435706  0.038047  0.268147  0.713251 -0.198438   1.18973      NaN  0.647639 -0.375385 -0.418327  0.186402 -0.698619  1.999057  0.424592
+        # 2008-01-11 -0.134092 -0.225108 -0.188916 -0.137051 -0.129813  -0.75082  0.756377      NaN    0.6385 -0.676059       NaN -0.496476 -0.597598    -0.235 -0.339108
+        print("success")
+
+    def _calc_str_sigma(self, code_return_df: pd.DataFrame, theta=0.1):
         """_summary_
 
         Args:
-            df (_type_): _description_
-        """
-        target_df = df[['date', 'amount']]
-        self.amount_df = pd.concat([self.amount_df, target_df], ignore_index=True)
+            code_return_df (pd.DataFrame): _description_
+            theta (float, optional): _description_. Defaults to 0.1.
 
-    def get_total_amount(self):
+        Returns:
+            _type_: _description_
+        """
+        _median = code_return_df.median(axis=1)
+        df_frac1 = code_return_df.sub(_median,axis=0).abs()
+        df_frac2 = code_return_df.abs().add(_median.abs(),axis=0) + theta
+        return df_frac1.div(df_frac2)
+
+    def _calc_str_weight(self, sigma: pd.DataFrame, cur_date, delta=0.7):
         """_summary_
+            计算凸显性权重
+        Args:
+            sigma (_type_): _description_
+            time_rage (int, optional): _description_. Defaults to 22.
+            delta (float, optional): _description_. Defaults to 0.7.
         """
-        # 按日期分组并对amount列求和
-        self.amount_df = self.amount_df.groupby('date')['amount'].sum().reset_index()
-        # 设置'date'列为索引
-        self.amount_df.set_index('date', inplace=True)
-        self.amount_df.sort_index(inplace=True)
-        self.amount_df["amount"] = np.log(self.amount_df['amount'])
+        # Get all dates up to cur_date and take the last time_range rows
+        time_range = self.time_range
+        
+        df = sigma.loc[:cur_date].iloc[-time_range:]
+        df_cleaned = df.dropna(axis=1, how='any')
+        df_rank= df_cleaned.rank(axis=0,ascending=False)
+        frac1 = df_rank.apply(lambda x: np.power(delta,x))
+        frac2 = frac1.mean(axis=1)
+        weight = frac1.div(frac2,axis=0)
+        assert frac1.iloc[0,1] / frac2.iloc[0] == weight.iloc[0,1]
+        return weight
 
-    def generate_slice_features(self, df):
+    def _STR_factor(self,
+             weight: pd.DataFrame,
+             return_df: pd.DataFrame,
+             cur_date):
+        """_summary_
+
+        Args:
+            weight (pd.DataFrame): _description_
+        """
+        time_range = self.time_range
+        ret_df = weight.rolling(time_range).cov(return_df)#.iloc[-1,:]
+        #print(ret_df.loc[cur_date])
+        #                       code   
+        # pctChg  sz002090    0.226865
+        #         sz002091   -1.435706
+        #         sz002092    0.038047
+        #         sz002093    0.268147
+        #         sz002094    0.713251
+        return ret_df.loc[cur_date]
+
+    def calculate_daily_str_factors(self, pivot_return_df: pd.DataFrame, n_jobs=-1):
+        """
+        计算每一天的STR因子。
+        
+        Args:
+            pivot_return_df (pd.DataFrame): 每日回报率数据框，其中索引是日期，列为不同的股票代码。
+            
+        Returns:
+            pd.DataFrame: 每天的STR因子数据框，其中索引是日期，列为不同的股票代码。
+        """
+        time_range = self.time_range
+        # 创建一个空的DataFrame来存储每天的STR因子
+        str_factors = pd.DataFrame(index=pivot_return_df.index, columns=pivot_return_df.columns)
+
+        sigma = self._calc_str_sigma(pivot_return_df)
+        
+        def _calculate_str_factor_for_date(cur_date, sigma,  return_df):
+            # 为每一天计算weight
+
+            weight = self._calc_str_weight(sigma=sigma, cur_date=cur_date)
+            str_factor = self._STR_factor(weight=weight, return_df=return_df, cur_date=cur_date)
+            return str_factor
+
+        # 遍历每一天
+        dates_to_process = pivot_return_df.index[time_range:]
+        
+        # 使用joblib进行并行计算
+        results = Parallel(n_jobs=n_jobs)(
+            delayed(_calculate_str_factor_for_date)(date, sigma, pivot_return_df)
+            for date in tqdm(dates_to_process, desc='Calculating STR factors')
+        )
+        
+        # 将结果存入str_factors DataFrame
+        for date, str_factor in zip(dates_to_process, results):
+            str_factors.loc[date] = str_factor
+
+        # # 遍历每一天
+        # for date in pivot_return_df.index[time_range:]:
+
+        #     # 为每一天计算weight
+        #     weight = self._calc_str_weight(sigma=sigma, cur_date=date, time_range=time_range)
+        #     str_factor = self._STR_factor(weight=weight, return_df=pivot_return_df, cur_date=date, time_range=time_range)
+
+        #     # 将STR因子存入str_factors DataFrame
+        #     str_factors.loc[date] = str_factor
+            
+        #     #print(str_factors.head(20))
+
+        return str_factors
+
+    def generate_slice_features(self, code):
         """新增基于横截面的特征
         - 成交量占比
 
         Args:
-            df (pd.DataFrame): 包含 'date' 和 'amount' 列的 DataFrame，其中 'date' 是索引
+            code (str): 股票代码，如'sh000001'，sh开头表示上证，sz开头表示深证
 
         Returns:
-            pd.DataFrame: 包含 'volume_ratio' 列的新 DataFrame
+            pd.DataFrame: 包含 'DAILY_AMOUNT_RATIO' 列的新 DataFrame，其中索引为日期
         """
-        # 确保 'amount' 列已经取对数
-        if not df.empty:
-            df['log_amount'] = np.log(df['amount'] + 1e-5)
+        features = {}
 
-            # 获取整体的对数金额（假设 self.amount_df 已经包含整体的对数金额数据）
-            overall_log_amount = self.amount_df.loc[df.index, 'amount']
+        ##step 1: 计算该股票的成交额占当日成交额的比例，并取对数       
+        df = self.stock_slice_df.loc[(slice(None), code), ['amount']]
+        df = df.reset_index(level='code', drop=True)
 
-            # 检查是否有缺失值
-            if df['log_amount'].isnull().any() or overall_log_amount.isnull().any():
-                print("Warning: NaN values found in log_amount or overall_log_amount")
-                return pd.DataFrame(index=df.index, columns=['volume_ratio'])
+        features['DAILY_AMOUNT_RATIO'] = np.log( (df['amount'] + 1) / self.amount_df['amount'] )
 
-            # 计算成交量占比
-            df['volume_ratio'] = df['log_amount'] - overall_log_amount
+        ## step 2:计算STR凸显性因子
+        # print(self._str_factor_df.index)
+        # print(self._str_factor_df.columns)
+        # print(self._str_factor_df.info())
+        # # 检查是否存在多级索引
+        # if isinstance(self._str_factor_df.index, pd.MultiIndex):
+        #     print("\nThe DataFrame has a MultiIndex.")
+        #     print("Levels of the MultiIndex:")
+        #     for i, level in enumerate(self._str_factor_df.index.levels):
+        #         print(f"Level {i}: {level.name} - {level.dtype}")
+        
+        # if code in self._str_factor_df.columns:
+        #     print("Column found and data extracted.")
+        # else:
+        #     print("Column 'sz002092' not found in the DataFrame.")
+            
+            
+        #str_series = self._str_factor_df[('pctChg', code)]
+        #print(str_series)
+        
+        
+        features["STR_FACTOR"] = self._str_factor_df[('pctChg', code)]
 
-            # 返回包含新特征的 DataFrame
-            return df[['volume_ratio']]
-
-        # 如果 df 为空，返回一个空的 DataFrame
-        return pd.DataFrame(columns=['volume_ratio'])
+        return pd.DataFrame(features, index=df.index)
 
     def generate_single_stock_features(self, df):
         """
@@ -111,15 +274,26 @@ class TALibFeature:
         - Overlap Studies(重叠指标)
             - EMA,Exponential Moving Average （指数移动平均线）
                     //- BBANDS,Bollinger Bands （布林带）
-            - SAR,Parabolic SAR （抛物线转向）
+            - SAR,Parabolic SAR （抛物线转向
+            - KAMA, Kaufman Adaptive Moving Average
+            - TEMA, Triple Exponential Moving Average
+            - TRIMA, Triangular Moving Average
         - Momentum Indicators(动量指标)
-            - RSI,Relative Strength Index （相对强弱指标）
             - ADX, Average Directional Movement Index
+            - APO, Absolute Price Oscillator
+            - AROON, Aroon
             - BOP, Balance Of Power
             - CCI, Commodity Channel Index
+            - CMO, Chande Momentum Oscillator
             - MACD, Moving Average Convergence/Divergence
             - MACDEXT, MACD with controllable MA type
             - MOM,Momentum
+            - MFI, Money Flow Index
+            - ROC, Rate of change : ((price/prevPrice)-1)*100
+            - RSI,Relative Strength Index （相对强弱指标）
+            - STOCHF, Stochastic Fast
+            - STOCHRSI, Stochastic Relative Strength Index
+            - TRIX, 1-day Rate-Of-Change (ROC) of a Triple Smooth EMA
             - ULTOSC,Ultimate Oscillator
             - WILLR,Williams' %R
         - Volume Indicators(成交量指标)
@@ -133,6 +307,7 @@ class TALibFeature:
         - Turnover Rate 换手率相关指标
             - EMA
             - MIX
+            - ROC
         - beta 指标
         Args:
             df (_type_): _description_
@@ -154,19 +329,35 @@ class TALibFeature:
 
 
         # EMA,Exponential Moving Average （指数移动平均线）
-        for period in self.feature_functions['EMA']['periods']:
+        for period in self.feature_functions['EMA']['timeperiod']:
             features[f'EMA_{period}'] = talib.EMA(df[close_col], timeperiod=period)
 
         # SAR,Parabolic SAR （抛物线转向）
         features['SAR'] = talib.SAR(df[high_col], df[low_col])
 
-        # RSI,Relative Strength Index （相对强弱指标）
-        for period in self.feature_functions['RSI']['periods']:
-            features[f'RSI_{period}'] = talib.RSI(df[close_col], timeperiod=period)
+        # KAMA, Kaufman Adaptive Moving Average
+        for period in self.feature_functions['KAMA']['timeperiod']:
+            features[f'KAMA_{period}'] = talib.KAMA(df[close_col], timeperiod=period)
 
+        # TEMA, 
+        for period in self.feature_functions['TEMA']['timeperiod']:
+            features[f'TEMA_{period}'] = talib.TEMA(df[close_col], timeperiod=period)
+
+        # TRIMA
+        for period in self.feature_functions['TRIMA']['timeperiod']:
+            features[f'TRIMA_{period}'] = talib.TRIMA(df[close_col], timeperiod=period)
+            
+        
         # ADX, Average Directional Movement Index
         for period in self.feature_functions['ADX']['timeperiod']:
             features[f'ADX_{period}'] = talib.ADX(df[high_col], df[low_col], df[close_col], timeperiod=period)
+
+        # APO
+        features['APO'] = talib.APO(df[close_col])
+        
+        # AROON
+        for period in self.feature_functions['AROON']['timeperiod']:
+            features[f'AROON_{period}_down'], features[f'AROON_{period}_up'] = talib.AROON(df[high_col], df[low_col], timeperiod=period)
 
         # BOP, Balance Of Power
         features['BOP'] = talib.BOP(df[open_col], df[high_col], df[low_col], df[close_col])
@@ -174,6 +365,10 @@ class TALibFeature:
         # CCI, Commodity Channel Index
         for period in self.feature_functions['CCI']['timeperiod']:
             features[f'CCI_{period}'] = talib.CCI(df[high_col], df[low_col], df[close_col], timeperiod=period)
+        
+        # CMO
+        for period in self.feature_functions['CMO']['timeperiod']:
+            features[f'CMO_{period}'] = talib.CMO(df[close_col], timeperiod=period)
         
         # MACD, Moving Average Convergence/Divergence
         macd, signal, hist = talib.MACD(df[close_col],
@@ -190,6 +385,33 @@ class TALibFeature:
         # MOM,Momentum
         for period in self.feature_functions['MOM']['timeperiod']:
             features[f'MOM_{period}'] = talib.MOM(df[close_col], timeperiod=period)
+
+        # MFI
+        for period in self.feature_functions['MFI']['timeperiod']:
+            features[f'MFI_{period}'] = talib.MFI(df[high_col], df[low_col], df[close_col], df[volume_col], timeperiod=period)
+
+        #ROC
+        for period in self.feature_functions['ROC']['timeperiod']:
+            features[f'ROC_{period}'] = talib.ROC(df[close_col], timeperiod=period)
+
+        # RSI,Relative Strength Index （相对强弱指标）
+        for period in self.feature_functions['RSI']['timeperiod']:
+            features[f'RSI_{period}'] = talib.RSI(df[close_col], timeperiod=period)
+            
+        # STOCHF
+        fastk, fastd = talib.STOCHF(df[high_col], df[low_col], df[close_col])
+        features['STOCHF_k'] = fastk
+        features['STOCHF_d'] = fastd
+        
+        #STOCHRSI
+        stochrsi_fastk, stochrsi_fastd = talib.STOCHRSI(df[close_col])
+        features['STOCHRSI_k'] = stochrsi_fastk
+        features['STOCHRSI_d'] = stochrsi_fastd
+        
+        #TRIX
+        for period in self.feature_functions['TRIX']['timeperiod']:
+            features[f'TRIX_{period}'] = talib.TRIX(df[close_col], timeperiod=period)
+
 
         # ULTOSC,Ultimate Oscillator
         features['ULTOSC'] = talib.ULTOSC(df[high_col], df[low_col], df[close_col])
@@ -220,11 +442,16 @@ class TALibFeature:
         features['TRANGE'] = talib.TRANGE(df[high_col], df[low_col], df[close_col])
 
         # Turnover Rate 换手率相关指标
-        for period in self.feature_functions['TURN_RATE']['periods']:
+        for period in self.feature_functions['TURN_RATE']['timeperiod']:
             features[f'TURN_RATE_{period}'] = talib.EMA(df[turn_col], timeperiod=period)
 
         ## Turnover Rate MIX, 将日、周、月换手率的加权平均值作为新特征
         features['TURN_RATE_MIX'] = df[turn_col]*0.35 + features['TURN_RATE_5']*0.35 + features['TURN_RATE_20']*0.3
+
+        ## Turnover Rate ROC
+        for period in self.feature_functions['TURN_RATE_ROC']['timeperiod']:
+            features[f'TURN_ROC_{period}'] = talib.ROC(df[turn_col], timeperiod=period)
+
 
         ## beta 指标,
         comm_dates = df.index
@@ -236,72 +463,88 @@ class TALibFeature:
 
     def process_directory(self, input_dir, output_dir):
         """处理整个目录的CSV文件"""
+        
         # 创建输出目录
         Path(output_dir).mkdir(parents=True, exist_ok=True)
-        print("Processing files for 1st round...")
-        # 处理每个CSV文件，第一轮遍历，计算总成交量，获取指数数据
+        
+        # 读取所有CSV文件
+        print("Reading files for 1st round...")
+        stock_data = {}
+        non_stock_data = {}
+        effective_count = 0
+        empty_count = 0
+        short_count = 0
         for file_path in Path(input_dir).glob('*.csv'):
             filename = file_path.name
-            if any(code in filename for code in self.stock_codes_set):
-                # 读取CSV文件
-                df = pd.read_csv(file_path,parse_dates=['date'])
 
-                # 提取需要的列
-                df = df[['date', 'amount']]
+            if any(code in filename for code in self.stock_codes_set): # 如果是股票
+                try:
+                     # 读取CSV文件
+                    df = pd.read_csv(file_path, index_col=0, parse_dates=True)
+                    if df.empty: # 去除空数据
+                        print(f"Empty file: {file_path.name}")
+                        empty_count += 1
+                        continue
 
-                # 将当前文件的数据追加到总的结果中
-                self.add_to_total_amount(df)
+                    # 如果数据长度不足，则跳过
+                    if len(df) < self.minimum_data_length:
+                        #print(f"Data too short: {file_path.name}")
+                        short_count += 1
+                        continue
 
-            # 检查文件名是否包含 index_code: sh000300
-            if self.index_code in filename:
-                # 读取CSV文件
+                    stock_data[file_path.name] = df
+                    effective_count += 1
+                except Exception as e:
+                    print(f"Error reading {file_path.name}: {str(e)}")
+            else:
+                print(f"Reading non-stock file: {file_path.name}")
+                df = pd.read_csv(file_path, parse_dates=['date'])
+                non_stock_data[file_path.name] = df
+
+            if self.index_code in filename: # 如果是指数
+                print(f"Reading index file: {file_path.name}")
                 df = pd.read_csv(file_path, parse_dates=['date'])
 
                 # 提取需要的列
                 self.index_df = df[['date', 'pctChg']]
                 self.index_df.set_index('date', inplace=True)
+        total_count = len(list(Path(input_dir).glob('*.csv')))
+        print(f"Total files: {total_count}, Stock files: {len(stock_data)}, Non-stock files: {len(non_stock_data)}")
+        print(f"Effective files: {effective_count}, Empty files: {empty_count}, Short files: {short_count}")
 
-        ##计算总成交量
-        print("Calculating total amount...")
-        self.get_total_amount()
-        print("Processing files for 2nd round...")
-         # 获取所有CSV文件列表
-        files = list(Path(input_dir).glob('*.csv'))
-        # 使用tqdm创建进度条
-        for file_path in tqdm(files, desc="Processing stocks", unit="file"):
+        ##计算横截面特征，需要先计算全局数据
+        self.pre_process_slice_features(stock_data)
+
+        # 处理每个CSV文件
+        for file_name, df in tqdm(stock_data.items(), desc="Process stock data...", unit="file"):
+            code = file_name.split('.')[0]
             try:
-                # 读取原始数据
-                df = pd.read_csv(file_path, index_col=0, parse_dates=True)
-                #print(f"Processing {file_path.name}...")
+                # 生成新特征
+                new_features = self.generate_single_stock_features(df)
+                slice_features = self.generate_slice_features(code)
 
-                if df.empty:
-                    print(f"Empty file: {file_path.name}")
-                    continue
-
-                # 如果是股票，则生成新特征
-                if any(code in file_path.name for code in self.stock_codes_set):
-                    new_features = self.generate_single_stock_features(df)
-                    slice_features = self.generate_slice_features(df)
-
-                    # 合并特征
-                    result = pd.concat([df, new_features], axis=1)
-                    result = pd.concat([result, slice_features], axis=1)
-                else:
-                    result = df
+                # 合并特征
+                result = pd.concat([df, new_features], axis=1)
+                result = pd.concat([result, slice_features], axis=1)
 
                 # 保存结果
-                output_path = Path(output_dir) / file_path.name
+                output_path = Path(output_dir) / file_name
                 result.to_csv(output_path)
-                #print(f"Successfully processed {file_path.name}")
+                #print(f"Successfully processed {file_name}")
 
             except Exception as e:
-                print(f"Error processing {file_path.name}: {str(e)}")
+                print(f"Error processing {file_name}: {str(e)}")
 
+        for file_name, df in tqdm(non_stock_data.items(), desc="Process non-stock data...", unit="file"):
+            # 仅保存沪深300的数据
+            if self.index_code in file_name:
+                output_path = Path(output_dir) / file_name
+                df.to_csv(output_path)
 
 def __test__():
     # 测试特征生成器
     basic_info_path = '/home/godlike/project/GoldSparrow/Day_Data/Day_data/qlib_data/basic_info.csv'
-    feature_generator = TALibFeature(basic_info_path=basic_info_path)
+    feature_generator = TALibFeature(basic_info_path=basic_info_path,time_range = 5)
     in_folder = '/home/godlike/project/GoldSparrow/Day_Data/Day_data/test_raw'
     out_folder = '/home/godlike/project/GoldSparrow/Day_Data/Day_data/test_raw_ta'
     feature_generator.process_directory(in_folder, out_folder)

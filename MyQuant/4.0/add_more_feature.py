@@ -2,13 +2,24 @@
 """
 
 import shutil
+import os
 from pathlib import Path
 import pandas as pd
 from ta_lib_feature import TALibFeature
 from mydump_bin import DumpDataAll
 
 
-def _dump_qlib_data(csv_path, qlib_data_path, max_workers=32):
+def _dump_qlib_data(csv_path, qlib_data_path, max_workers=8):
+    
+    features = f"{qlib_data_path}/features"
+    calendars = f"{qlib_data_path}/calendars"
+
+    if os.path.exists(features) and os.path.isdir(features):
+        shutil.rmtree(features)
+
+    if os.path.exists(calendars) and os.path.isdir(calendars):
+        shutil.rmtree(calendars)
+
     print("dump qlib data")
     DumpDataAll(
         csv_path= csv_path,
@@ -48,11 +59,15 @@ def add_features(data_dir, output_dir,basic_info_path):
     output_dir : str
         Directory to save the processed files with new features
     """
-    ta_feature_generator = TALibFeature(basic_info_path=basic_info_path)
+    ta_feature_generator = TALibFeature(basic_info_path=basic_info_path,time_range=30)
 
-    # Create output directory if it doesn't exist
+    if os.path.exists(output_dir) and os.path.isdir(output_dir):
+        # 使用 shutil.rmtree 高效地移除整个目录树
+        shutil.rmtree(output_dir)
+
+
+    # # 重新创建目录
     Path(output_dir).mkdir(parents=True, exist_ok=True)
-
     ta_feature_generator.process_directory(data_dir, output_dir)
 
 if __name__ == "__main__":
@@ -61,7 +76,7 @@ if __name__ == "__main__":
     merged_directory = "/home/godlike/project/GoldSparrow/Day_Data/Day_data/Merged_talib"
     qlib_directory = "/home/godlike/project/GoldSparrow/Day_Data/Day_data/qlib_data"
     basic_info_path = '/home/godlike/project/GoldSparrow/Day_Data/Day_data/qlib_data/basic_info.csv'
-    
+
     # data_directory = "/root/autodl-tmp/GoldSparrow/Day_data/Raw"
     # merged_directory = "/root/autodl-tmp/GoldSparrow/Day_data/Merged_talib"
     # qlib_directory = "/root/autodl-tmp/GoldSparrow/Day_data/qlib_data"

@@ -99,7 +99,7 @@ class STRFeature:
             all_code = D.list_instruments(D.instruments("all"), as_list=True)
             returns = D.features(all_code, fields=["$close/Ref($close,1)-1"])
             returns = returns.unstack(level=0)["$close/Ref($close,1)-1"]
-            
+
             time_range = 22
             sigma = self._calc_sigma(returns)
             weight = self._calc_weight(sigma, time_range)
