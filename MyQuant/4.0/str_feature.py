@@ -104,7 +104,22 @@ class STRFeature:
             sigma = self._calc_sigma(returns)
             weight = self._calc_weight(sigma, time_range)
             return self._STR_factor(weight,returns,time_range)
-    #def process_directory(self, input_dir, output_dir):
+    
+    def process_directory(self, input_dir, output_dir):
+        """_summary_
+
+        Args:
+            input_dir (_type_): _description_
+            output_dir (_type_): _description_
+        """
+        # 创建输出目录
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
+
+        for file_path in Path(input_dir).glob('*.csv'):
+            filename = file_path.name
+            if any(code in filename for code in self.stock_codes_set):
+                # 读取CSV文件
+                df = pd.read_csv(file_path,parse_dates=['date'])
 
 def __test__():
     # 测试特征生成器
