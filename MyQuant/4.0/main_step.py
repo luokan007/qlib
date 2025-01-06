@@ -32,10 +32,10 @@ pool = 'csi300'
 # valid = ('2015-01-01','2016-12-31')
 # test = ('2017-01-01', '2020-12-31')
 
-train = ('2008-01-01','2020-12-31')
-valid = ('2021-01-01','2022-12-31')
-test = ('2023-01-01', '2024-12-18')
-model_type = 'lstm' # 模型类型
+train = ('2008-01-01','2015-12-31')
+valid = ('2016-01-01','2018-12-31')
+test = ('2019-01-01', '2024-12-18')
+model_type = 'alstm' # 模型类型
 
 
 # 要采用的机器学习模型是否有早停机制
@@ -113,7 +113,8 @@ if early_stopping == True: # 若使用带早停的模型，如线LGBModel
                 lr= 0.00001,
                 early_stop=20,
                 batch_size=800,
-                metric="loss")
+                metric="loss",
+                GPU=0)
     elif model_type == "alstm":
         model = ALSTM(d_feat=236,
                 hidden_size=64,
@@ -125,7 +126,7 @@ if early_stopping == True: # 若使用带早停的模型，如线LGBModel
                 batch_size=800,
                 metric="loss",
                 loss="mse",
-                n_jobs=8,
+                n_jobs=18,
                 GPU=0,
                 rnn_type="GRU")
     else:

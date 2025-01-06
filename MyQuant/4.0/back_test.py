@@ -207,13 +207,17 @@ def main():
     # backtest.run()
     
     ## 基于自定义预测文件的回测
-    report_file_path = '/home/godlike/project/GoldSparrow/Offline_Report/self_alpha_LSTM_v2.html'
-    output_dir = "/home/godlike/project/GoldSparrow/Temp_Data"
+    # report_file_path = '/home/godlike/project/GoldSparrow/Offline_Report/self_alpha_LSTM_v2.html'
+    # output_dir = "/home/godlike/project/GoldSparrow/Temp_Data"
+    #provider_uri = "/home/godlike/project/GoldSparrow/Day_Data/Day_data/qlib_data"
+    report_file_path = '/root/autodl-tmp/GoldSparrow/Experiment_Result/self_alpha_ALSTM_v3-5year.html'
+    output_dir = "/root/autodl-tmp/GoldSparrow/Temp_Data"
+    provider_uri = "/root/autodl-tmp/GoldSparrow/Day_data/qlib_data"
+    
+    
     pkl_path = os.path.join(output_dir, 'pred.pkl')
-    provider_uri = "/home/godlike/project/GoldSparrow/Day_Data/Day_data/qlib_data"
     backtest = BackTest.from_pred_file(provider_uri = provider_uri, pred_file_path = pkl_path,report_name = report_file_path)
     backtest.run()
-    
     # ### 基于1.3版本产生的experiment id的回测
     # report_file_path = '/home/godlike/project/GoldSparrow/Offline_Report/LSTM_benchmark.html'
     # provider_uri = "/home/godlike/project/GoldSparrow/Updated_Stock_Data"
