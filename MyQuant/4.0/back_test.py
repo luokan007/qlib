@@ -207,7 +207,7 @@ def main():
     # backtest.run()
     
     ## 基于自定义预测文件的回测
-    report_file_path = '/home/godlike/project/GoldSparrow/Offline_Report/self_alpha_LSTM_v2.html'
+    report_file_path = '/home/godlike/project/GoldSparrow/Offline_Report/self_alpha_LSTM_v3-5year.html'
     output_dir = "/home/godlike/project/GoldSparrow/Temp_Data"
     pkl_path = os.path.join(output_dir, 'pred.pkl')
     provider_uri = "/home/godlike/project/GoldSparrow/Day_Data/Day_data/qlib_data"

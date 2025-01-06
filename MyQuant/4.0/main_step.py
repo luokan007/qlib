@@ -39,9 +39,9 @@ pool = 'csi300'
 # valid = ('2015-01-01','2016-12-31')
 # test = ('2017-01-01', '2020-12-31')
 
-train = ('2008-01-01','2020-12-31')
-valid = ('2021-01-01','2022-12-31')
-test = ('2023-01-01', '2024-12-18')
+train = ('2008-01-01','2016-12-31')
+valid = ('2017-01-01','2019-12-31')
+test = ('2020-01-01', '2024-12-18')
 model_type = 'lstm' # 模型类型
 
 
@@ -68,6 +68,10 @@ fit_end_time = train[1]
 infer_processors = [RobustZScoreNorm(fit_start_time=fit_start_time, fit_end_time=fit_end_time, 
                                      fields_group='feature',
                                      clip_outlier=True),Fillna(fields_group='feature')]
+
+# infer_processors = [RobustZScoreNorm(fit_start_time=fit_start_time, fit_end_time=fit_end_time, 
+#                                       fields_group='feature',
+#                                       clip_outlier=True),DropnaProcessor(fields_group='feature')]
 learn_processors = [DropnaLabel(),CSRankNorm(fields_group='label')]
 
 
@@ -116,9 +120,9 @@ if early_stopping == True: # 若使用带早停的模型，如线LGBModel
                 hidden_size=64,
                 num_layers=2,
                 dropout=0,
-                n_epochs=20,
+                n_epochs=50,
                 lr= 0.00001,
-                early_stop=10,
+                early_stop=20,
                 batch_size=800,
                 metric="loss",
                 GPU=0)
@@ -127,9 +131,9 @@ if early_stopping == True: # 若使用带早停的模型，如线LGBModel
                 hidden_size=64,
                 num_layers=2,
                 dropout=0,
-                n_epochs=20,
+                n_epochs=50,
                 lr= 0.00001,
-                early_stop=10,
+                early_stop=20,
                 batch_size=800,
                 metric="loss",
                 loss="mse",
