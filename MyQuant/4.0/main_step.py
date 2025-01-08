@@ -99,12 +99,14 @@ data_handler = MyAlpha158Ext(instruments=pool,
 #        )
 
 # 最终生成数据集
-if model_type == "lstm":
+if model_type.lower() == "lstm":
     ds = DatasetH(handler = data_handler, segments={"train": train,"valid": valid, "test":test})
-elif model_type == "linear":
+elif model_type.lower() == "lgbmodel":
+    ds = DatasetH(handler = data_handler, segments={"train": train,"valid": valid, "test":test})
+elif model_type.lower() == "linear":
     ds = DatasetH(handler = data_handler, segments={"train": train,"test":test})
-elif model_type == "alstm":
-    ds = TSDatasetH(step_len = 30, handler = data_handler, segments={"train": train,"valid": valid, "test":test})
+elif model_type.lower() == "alstm":
+    ds = TSDatasetH(step_len = 10, handler = data_handler, segments={"train": train,"valid": valid, "test":test})
 else:
     raise ValueError(f"model_type={model_type} not supported")
 
