@@ -1,15 +1,6 @@
 # %%
 import qlib
-import pandas as pd
-from qlib.constant import REG_CN
-from qlib.utils import exists_qlib_data, init_instance_by_config
-from qlib.workflow import R # 实验记录管理器
-from qlib.workflow.record_temp import SignalRecord,SigAnaRecord,PortAnaRecord
-from qlib.utils import flatten_dict
 
-from qlib.data.dataset.loader import QlibDataLoader, StaticDataLoader
-from qlib.data import D # 基础行情数据服务的对象
-from qlib.data.filter import ExpressionDFilter
 from qlib.data.dataset.handler import DataHandlerLP
 from qlib.data.dataset.processor import CSZScoreNorm, DropnaProcessor, RobustZScoreNorm, Fillna,DropnaLabel,CSRankNorm
 from qlib.data.dataset import DatasetH
@@ -29,7 +20,9 @@ from qlib.contrib.data.handler import Alpha158
 
 # %%
 # qlib内置行情数据存放目录
-provider_uri = "/home/godlike/project/GoldSparrow/Day_Data/Day_data/qlib_data"  
+provider_uri = "/root/autodl-tmp/GoldSparrow/Day_data/qlib_data"
+# 设置输出目录
+output_dir = "/root/autodl-tmp/GoldSparrow/Temp_Data"
 qlib.init(provider_uri=provider_uri, region="cn")
 # 股池设置
 pool = 'csi300'
@@ -139,7 +132,7 @@ if early_stopping == True: # 若使用带早停的模型，如线LGBModel
                 batch_size=800,
                 metric="loss",
                 loss="mse",
-                n_jobs=8,
+                n_jobs=18,
                 GPU=0,
                 rnn_type="GRU")
     else:
@@ -158,8 +151,7 @@ pred_series = model.predict(dataset=ds)
 # 转换为DataFrame并添加列名
 pred = pred_series.to_frame("score")
 
-# 设置输出目录
-output_dir = "/home/godlike/project/GoldSparrow/Temp_Data"
+
 Path(output_dir).mkdir(parents=True, exist_ok=True)
 
 # 格式化索引和导出
