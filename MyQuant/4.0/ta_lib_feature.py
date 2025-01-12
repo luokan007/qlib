@@ -52,18 +52,46 @@ class TALibFeature:
             'ATR': {'timeperiod': [14, 28]},
             'NATR': {'timeperiod': [14, 28]},
             'TRANGE': {},
+            
+            'LINEARREG_SLOPE': {'timeperiod': [5, 14, 28]},
+            'TSF': {'timeperiod': [5, 10, 20, 40]},
+            'VAR': {'timeperiod': [5, 10, 20, 40]},
 
-            'TURN_RATE': {'timeperiod': [5, 10, 20]},
+            'TURN_RATE_LN': {},
+            'TURN_RATE_EMA': {'timeperiod': [5, 10, 20]},
             'TURN_RATE_MIX':{},
-            'TURN_RATE_ROC':{'timeperiod': [6, 12, 24, 48]},
+            'TURN_ROC':{'timeperiod': [5, 10, 20, 40]},
+            'TURN_SLOPE': {'timeperiod': [5, 10, 20, 40]},
+            'TURN_RSI': {'timeperiod': [5, 10, 20, 40]},
+            'TURN_ATX': {'timeperiod': [5, 10, 20, 40]},
+            'TURN_ADX': {'timeperiod': [5, 10, 20, 40]},
+            'TURN_TSF': {'timeperiod': [5, 10, 20, 40]},
 
-            'BETA': {}
+            'BETA': {},
+            
+            'AMOUNT_LN': {},
+            'AMT_RSQR': {},
+            'AMT_MAX': {'timeperiod': [5, 10, 20,40]},
+            'AMT_MIN': {'timeperiod': [5, 10, 20,40]},
+            'AMT_STD': {'timeperiod': [5, 10, 20,40]},
+            'AMT_EMA': {'timeperiod': [5, 10, 20,40]},
+            'AMT_ROC': {'timeperiod': [5, 10, 20, 40]},
+            'AMT_TRIX': {'timeperiod': [5, 10, 20, 40]},
+            'AMT_SLOPE': {'timeperiod': [5, 10, 20, 40]},
+            'AMT_RSI': {'timeperiod': [5, 10, 20, 40]},
+            'AMT_ATR': {'timeperiod': [5, 10, 20, 40]},
+            'AMT_ADX': {'timeperiod': [5, 10, 20, 40]},
+            'AMT_TSF': {'timeperiod': [5, 10, 20, 40]},
+            'AMT_VAR': {'timeperiod': [5, 10, 20, 40]}
+            
+            
         }
 
         self.minimum_data_length = 200 # 最小数据长度,去除交易时间过短的数据，200约为一年的时长
 
         self.median_df = pd.DataFrame()
         self.amount_df = pd.DataFrame()
+        self.rank_df = pd.DataFrame()
         self.index_code = "sh000300"
         self.index_df = pd.DataFrame(columns=['date', 'pctChg'])
 
@@ -97,6 +125,9 @@ class TALibFeature:
 
         self.amount_df['amount'] = self.stock_slice_df.groupby(level='date')['amount'].sum()
         #print(self.amount_df)
+        
+        ## 计算每只股票在当天涨跌幅中的排名，并取对数
+        self.rank_df = self.stock_slice_df['pctChg'].groupby(level='date').rank(ascending=False)
 
         ##计算STR凸显性因子
         return_df = pd.DataFrame()
@@ -271,44 +302,69 @@ class TALibFeature:
     def generate_single_stock_features(self, df):
         """
         新增更多基于ta-lib的特征
-        - Overlap Studies(重叠指标)
-            - EMA,Exponential Moving Average （指数移动平均线）
-                    //- BBANDS,Bollinger Bands （布林带）
-            - SAR,Parabolic SAR （抛物线转向
-            - KAMA, Kaufman Adaptive Moving Average
-            - TEMA, Triple Exponential Moving Average
-            - TRIMA, Triangular Moving Average
-        - Momentum Indicators(动量指标)
-            - ADX, Average Directional Movement Index
-            - APO, Absolute Price Oscillator
-            - AROON, Aroon
-            - BOP, Balance Of Power
-            - CCI, Commodity Channel Index
-            - CMO, Chande Momentum Oscillator
-            - MACD, Moving Average Convergence/Divergence
-            - MACDEXT, MACD with controllable MA type
-            - MOM,Momentum
-            - MFI, Money Flow Index
-            - ROC, Rate of change : ((price/prevPrice)-1)*100
-            - RSI,Relative Strength Index （相对强弱指标）
-            - STOCHF, Stochastic Fast
-            - STOCHRSI, Stochastic Relative Strength Index
-            - TRIX, 1-day Rate-Of-Change (ROC) of a Triple Smooth EMA
-            - ULTOSC,Ultimate Oscillator
-            - WILLR,Williams' %R
-        - Volume Indicators(成交量指标)
-            - AD, Chaikin A/D Line
-            - ADOSC, Chaikin A/D Oscillator
-            - OBV, On Balance Volume
-        - Volatility Indicators(波动率指标)
-            - ATR, Average True Range
-            - NATR, Normalized Average True Range
-            - TRANGE, True Range
+        价格相关
+            - Overlap Studies(重叠指标)
+                - EMA,Exponential Moving Average （指数移动平均线）
+                        //- BBANDS,Bollinger Bands （布林带）
+                - SAR,Parabolic SAR （抛物线转向
+                - KAMA, Kaufman Adaptive Moving Average
+                - TEMA, Triple Exponential Moving Average
+                - TRIMA, Triangular Moving Average
+            - Momentum Indicators(动量指标)
+                - ADX, Average Directional Movement Index
+                - APO, Absolute Price Oscillator
+                - AROON, Aroon
+                - BOP, Balance Of Power
+                - CCI, Commodity Channel Index
+                - CMO, Chande Momentum Oscillator
+                - MACD, Moving Average Convergence/Divergence
+                - MACDEXT, MACD with controllable MA type
+                - MOM,Momentum
+                - MFI, Money Flow Index
+                - ROC, Rate of change : ((price/prevPrice)-1)*100
+                - RSI,Relative Strength Index （相对强弱指标）
+                - STOCHF, Stochastic Fast
+                - STOCHRSI, Stochastic Relative Strength Index
+                - TRIX, 1-day Rate-Of-Change (ROC) of a Triple Smooth EMA
+                - ULTOSC,Ultimate Oscillator
+                - WILLR,Williams' %R
+            - Volume Indicators(成交量指标)
+                - AD, Chaikin A/D Line
+                - ADOSC, Chaikin A/D Oscillator
+                - OBV, On Balance Volume
+            - Volatility Indicators(波动率指标)
+                - ATR, Average True Range
+                - NATR, Normalized Average True Range
+                - TRANGE, True Range
+            - Statistic Functions(统计函数)
+                - LINEARREG_SLOPE - v4.1, Linear Regression Slope 
+                - TSF - v4.1, Time Series Forecast
+                - VAR - v4.1, Variance
+            - beta 指标
         - Turnover Rate 换手率相关指标
-            - EMA
-            - MIX
-            - ROC
-        - beta 指标
+            - Log, TURN_RATE_LN,成交量的对数
+            - EMA, TURN_RATE_EMA
+            - MIX, TURN_RATE_MIX
+            - ROC, TURN_ROC_
+            - SLOPE, TURN_SLOPE_ , v4.1
+            - RSI, TURN_RSI_, v4.1
+            - ATX, TURN_ATX_, v4.1
+            - ADX, TURN_ADX_, v4.1
+            - TSF, TURN_TSF_, v4.1
+        - Amount，成交量相关指标,v4.1, 
+            - AMOUNT_LN, 成交量的对数
+            Math, 数学运算
+                - AMT_MAX, 成交量的对数的最大值
+                - AMT_MIN, 成交量的对数的最小值
+                - AMT_STD, 成交量的对数的标准差
+            Overlap/Momentum/Statistics
+            - AMT_EMA
+            - AMT_ROC
+            - AMT_TRIX
+            - AMT_SLOPE, Linear Regression Slope
+            - AMT_RSI
+            - AMT_TSF
+            - AMT_VAR
         Args:
             df (_type_): _description_
 
@@ -326,7 +382,7 @@ class TALibFeature:
         volume_col = 'volume' if 'volume' in df.columns else 'Volume'
         turn_col = 'turn' if 'turn' in df.columns else 'Turnover'
         pct_chg_col = 'pctChg' if 'pctChg' in df.columns else 'pct_chg'
-
+        amount_col = 'amount' if 'amount' in df.columns else 'Amount'
 
         # EMA,Exponential Moving Average （指数移动平均线）
         for period in self.feature_functions['EMA']['timeperiod']:
@@ -441,24 +497,103 @@ class TALibFeature:
         # TRANGE, True Range
         features['TRANGE'] = talib.TRANGE(df[high_col], df[low_col], df[close_col])
 
+        # LINEARREG_SLOPE - v4.1, Linear Regression Slope
+        for period in self.feature_functions['LINEARREG_SLOPE']['timeperiod']:
+            features[f'LINEARREG_SLOPE_{period}'] = talib.LINEARREG_SLOPE(df[close_col], timeperiod=period)
+        
+        for period in self.feature_functions['TSF']['timeperiod']:
+            features[f'TSF_{period}'] = talib.TSF(df[close_col], timeperiod=period)
+        
+        for period in self.feature_functions['VAR']['timeperiod']:
+            features[f'VAR_{period}'] = talib.VAR(df[close_col], timeperiod=period)
+        
+        features['TURN_RATE_LN'] = np.log(df[turn_col]+0.000001)
+        
         # Turnover Rate 换手率相关指标
-        for period in self.feature_functions['TURN_RATE']['timeperiod']:
-            features[f'TURN_RATE_{period}'] = talib.EMA(df[turn_col], timeperiod=period)
+        for period in self.feature_functions['TURN_RATE_EMA']['timeperiod']:
+            features[f'TURN_RATE_EMA_{period}'] = talib.EMA(df[turn_col], timeperiod=period)
 
         ## Turnover Rate MIX, 将日、周、月换手率的加权平均值作为新特征
         features['TURN_RATE_MIX'] = df[turn_col]*0.35 + features['TURN_RATE_5']*0.35 + features['TURN_RATE_20']*0.3
 
         ## Turnover Rate ROC
-        for period in self.feature_functions['TURN_RATE_ROC']['timeperiod']:
+        for period in self.feature_functions['TURN_ROC']['timeperiod']:
             features[f'TURN_ROC_{period}'] = talib.ROC(df[turn_col], timeperiod=period)
 
+        ## Turnover Rate SLOPE
+        for period in self.feature_functions['TURN_SLOPE']['timeperiod']:
+            features[f'TURN_SLOPE_{period}'] = talib.LINEARREG_SLOPE(df[turn_col], timeperiod=period)
+        
+        ## Turnover Rate RSI
+        for period in self.feature_functions['TURN_RSI']['timeperiod']:
+            features[f'TURN_RSI_{period}'] = talib.RSI(df[turn_col], timeperiod=period)
+        
+        ## Turnover Rate ATX
+        for period in self.feature_functions['TURN_ATX']['timeperiod']:
+            features[f'TURN_ATX_{period}'] = talib.ATR(df[turn_col], timeperiod=period)
+        
+        ## Turnover Rate ADX
+        for period in self.feature_functions['TURN_ADX']['timeperiod']:
+            features[f'TURN_ADX_{period}'] = talib.ADX(df[turn_col], timeperiod=period)
+        
+        ## Turnover Rate TSF
+        for period in self.feature_functions['TURN_TSF']['timeperiod']:
+            features[f'TURN_TSF_{period}'] = talib.TSF(df[turn_col], timeperiod=period)
+            
 
         ## beta 指标,
         comm_dates = df.index
         aligned_index_df = self.index_df.loc[comm_dates]
         aligned_index_df.fillna(0, inplace=True)
         features['BETA'] = talib.BETA(df[pct_chg_col], aligned_index_df[pct_chg_col], timeperiod=40)
+        
+        ## Amount，成交量相关指标
+        df['AMOUNT_LN'] = np.log(df[amount_col]+1)
+        amount_ln_col = 'AMOUNT_LN'
+        ## AMOUNT_LN, 成交量的对数
+        features[amount_ln_col] = df[amount_ln_col]
+        
+        ## Math, 数学运算
+        ## AMT_MAX, 成交量的对数的最大值
+        for period in self.feature_functions['AMT_MAX']['timeperiod']:
+            features[f'AMT_MAX_{period}'] = talib.MAX(df[amount_ln_col], timeperiod=period)
+        
+        ## AMT_MIN, 成交量的对数的最小值
+        for period in self.feature_functions['AMT_MIN']['timeperiod']:
+            features[f'AMT_MIN_{period}'] = talib.MIN(df[amount_ln_col], timeperiod=period)
+        
+        ## AMT_STD, 成交量的对数的标准差
+        for period in self.feature_functions['AMT_STD']['timeperiod']:
+            features[f'AMT_STD_{period}'] = talib.STDDEV(df[amount_ln_col], timeperiod=period)
+        
+        ## Overlap/Momentum/Statistics
+        ## AMT_EMA
+        for period in self.feature_functions['AMT_EMA']['timeperiod']:
+            features[f'AMT_EMA_{period}'] = talib.EMA(df[amount_ln_col], timeperiod=period)
+        
+        ## AMT_ROC
+        for period in self.feature_functions['AMT_ROC']['timeperiod']:
+            features[f'AMT_ROC_{period}'] = talib.ROC(df[amount_ln_col], timeperiod=period)
 
+        ## AMT_TRIX
+        for period in self.feature_functions['AMT_TRIX']['timeperiod']:
+            features[f'AMT_TRIX_{period}'] = talib.TRIX(df[amount_ln_col], timeperiod=period)
+        
+        ## AMT_SLOPE, Linear Regression Slope
+        for period in self.feature_functions['AMT_SLOPE']['timeperiod']:
+            features[f'AMT_SLOPE_{period}'] = talib.LINEARREG_SLOPE(df[amount_ln_col], timeperiod=period)
+        
+        ## AMT_RSI
+        for period in self.feature_functions['AMT_RSI']['timeperiod']:
+            features[f'AMT_RSI_{period}'] = talib.RSI(df[amount_ln_col], timeperiod=period)
+        
+        ## AMT_TSF
+        for period in self.feature_functions['AMT_TSF']['timeperiod']:
+            features[f'AMT_TSF_{period}'] = talib.TSF(df[amount_ln_col], timeperiod=period)
+        
+        ## AMT_VAR
+        for period in self.feature_functions['AMT_VAR']['timeperiod']:
+            features[f'AMT_VAR_{period}'] = talib.VAR(df[amount_ln_col], timeperiod=period)
         return pd.DataFrame(features, index=df.index)
 
     def process_directory(self, input_dir, output_dir):
