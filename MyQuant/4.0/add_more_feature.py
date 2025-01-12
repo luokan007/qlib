@@ -36,7 +36,7 @@ def _dump_qlib_data(csv_path, qlib_data_path, max_workers=8):
 
 def _fix_constituents(qlib_data_path):
     
-    today = '2024-12-20' #str(datetime.date.today())
+    today = '2025-01-10' #str(datetime.date.today())
     path = f"{qlib_data_path}/instruments"
 
     for p in Path(path).iterdir():
@@ -72,15 +72,15 @@ def add_features(data_dir, output_dir,basic_info_path):
 
 if __name__ == "__main__":
     # Define input and output directories
-    data_directory = "/home/godlike/project/GoldSparrow/Day_Data/Day_data/Raw"
-    merged_directory = "/home/godlike/project/GoldSparrow/Day_Data/Day_data/Merged_talib"
-    qlib_directory = "/home/godlike/project/GoldSparrow/Day_Data/Day_data/qlib_data"
-    basic_info_path = '/home/godlike/project/GoldSparrow/Day_Data/Day_data/qlib_data/basic_info.csv'
+    # data_directory = "/home/godlike/project/GoldSparrow/Day_Data/Day_data/Raw"
+    # merged_directory = "/home/godlike/project/GoldSparrow/Day_Data/Day_data/Merged_talib"
+    # qlib_directory = "/home/godlike/project/GoldSparrow/Day_Data/Day_data/qlib_data"
+    # basic_info_path = '/home/godlike/project/GoldSparrow/Day_Data/Day_data/qlib_data/basic_info.csv'
 
-    # data_directory = "/root/autodl-tmp/GoldSparrow/Day_data/Raw"
-    # merged_directory = "/root/autodl-tmp/GoldSparrow/Day_data/Merged_talib"
-    # qlib_directory = "/root/autodl-tmp/GoldSparrow/Day_data/qlib_data"
-    # basic_info_path = '/root/autodl-tmp/GoldSparrow/Day_data/qlib_data/basic_info.csv'
+    data_directory = "/root/autodl-tmp/GoldSparrow/Day_data/Raw"
+    merged_directory = "/root/autodl-tmp/GoldSparrow/Day_data/Merged_talib"
+    qlib_directory = "/root/autodl-tmp/GoldSparrow/Day_data/qlib_data"
+    basic_info_path = '/root/autodl-tmp/GoldSparrow/Day_data/qlib_data/basic_info.csv'
 
     
     # Process the data

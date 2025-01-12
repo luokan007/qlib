@@ -58,19 +58,18 @@ class TALibFeature:
             'VAR': {'timeperiod': [5, 10, 20, 40]},
 
             'TURN_RATE_LN': {},
+            'TURN_MAX': {'timeperiod': [5, 10, 20, 40]},
+            'TURN_MIN': {'timeperiod': [5, 10, 20, 40]},
+            'TURN_STD': {'timeperiod': [5, 10, 20, 40]},
             'TURN_RATE_EMA': {'timeperiod': [5, 10, 20]},
-            'TURN_RATE_MIX':{},
             'TURN_ROC':{'timeperiod': [5, 10, 20, 40]},
             'TURN_SLOPE': {'timeperiod': [5, 10, 20, 40]},
             'TURN_RSI': {'timeperiod': [5, 10, 20, 40]},
-            'TURN_ATX': {'timeperiod': [5, 10, 20, 40]},
-            'TURN_ADX': {'timeperiod': [5, 10, 20, 40]},
             'TURN_TSF': {'timeperiod': [5, 10, 20, 40]},
 
             'BETA': {},
             
             'AMOUNT_LN': {},
-            'AMT_RSQR': {},
             'AMT_MAX': {'timeperiod': [5, 10, 20,40]},
             'AMT_MIN': {'timeperiod': [5, 10, 20,40]},
             'AMT_STD': {'timeperiod': [5, 10, 20,40]},
@@ -79,8 +78,6 @@ class TALibFeature:
             'AMT_TRIX': {'timeperiod': [5, 10, 20, 40]},
             'AMT_SLOPE': {'timeperiod': [5, 10, 20, 40]},
             'AMT_RSI': {'timeperiod': [5, 10, 20, 40]},
-            'AMT_ATR': {'timeperiod': [5, 10, 20, 40]},
-            'AMT_ADX': {'timeperiod': [5, 10, 20, 40]},
             'AMT_TSF': {'timeperiod': [5, 10, 20, 40]},
             'AMT_VAR': {'timeperiod': [5, 10, 20, 40]}
             
@@ -92,6 +89,7 @@ class TALibFeature:
         self.median_df = pd.DataFrame()
         self.amount_df = pd.DataFrame()
         self.rank_df = pd.DataFrame()
+        self.effective_stock_count_df = pd.DataFrame()
         self.index_code = "sh000300"
         self.index_df = pd.DataFrame(columns=['date', 'pctChg'])
 
@@ -127,7 +125,37 @@ class TALibFeature:
         #print(self.amount_df)
         
         ## 计算每只股票在当天涨跌幅中的排名，并取对数
-        self.rank_df = self.stock_slice_df['pctChg'].groupby(level='date').rank(ascending=False)
+        self.rank_df['rank'] = self.stock_slice_df['pctChg'].groupby(level='date').rank(ascending=False)
+        #print(self.rank_df.head())
+        #                       rank
+        #   date        code    
+        # 2008-01-02  sh600030    15.0
+        #             sh600031    12.0
+        #             sh600033     5.0
+        #             sh600035     6.0
+        #             sh600036    14.0
+        #             sh600037     2.0
+        #             sh600039     8.0
+        #             sh600048     9.0
+        #             sh600060     3.0
+        #             sh600061    11.0
+        #             sh600062    10.0
+        #             sh600063     4.0
+        #             sh600064     1.0
+        #             sh600066    13.0
+        #             sh600068     7.0
+        
+        ##计算总的有效股票数
+        self.effective_stock_count_df['count'] = self.stock_slice_df.groupby(level='date')['pctChg'].count()
+        #print(self.effective_stock_count_df)
+        #              count
+        # date             
+        # 2008-01-02     15
+        # 2008-01-03     16
+        # 2008-01-04     17
+        # 2008-01-07     17
+        # 2008-01-08     17
+        
 
         ##计算STR凸显性因子
         return_df = pd.DataFrame()
@@ -296,12 +324,21 @@ class TALibFeature:
         
         
         features["STR_FACTOR"] = self._str_factor_df[('pctChg', code)]
+        
+        ## step 3:计算涨跌幅排名
+        rank_series = self.rank_df.loc[(slice(None), code), ['rank']]
+        rank_series = rank_series.reset_index(level='code', drop=True)
+
+        features['RANK'] = np.log(rank_series['rank'] / self.effective_stock_count_df['count'])
+        #print(features['RANK'])
 
         return pd.DataFrame(features, index=df.index)
 
     def generate_single_stock_features(self, df):
         """
         新增更多基于ta-lib的特征
+        市值因子
+            - size = price*factor*total_share/factor
         价格相关
             - Overlap Studies(重叠指标)
                 - EMA,Exponential Moving Average （指数移动平均线）
@@ -342,14 +379,16 @@ class TALibFeature:
                 - VAR - v4.1, Variance
             - beta 指标
         - Turnover Rate 换手率相关指标
-            - Log, TURN_RATE_LN,成交量的对数
+            - Log, TURN_RATE_LN,v4.1, 成交量的对数
+            Math, 数学运算
+                - TURN_MAX, v4.1, 成交量的对数的最大值
+                - TURN_MIN, 成交量的对数的最小值
+                - TURN_STD, 成交量的对数的标准差
+            Overlap/Momentum/Statistics
             - EMA, TURN_RATE_EMA
-            - MIX, TURN_RATE_MIX
             - ROC, TURN_ROC_
             - SLOPE, TURN_SLOPE_ , v4.1
             - RSI, TURN_RSI_, v4.1
-            - ATX, TURN_ATX_, v4.1
-            - ADX, TURN_ADX_, v4.1
             - TSF, TURN_TSF_, v4.1
         - Amount，成交量相关指标,v4.1, 
             - AMOUNT_LN, 成交量的对数
@@ -383,6 +422,12 @@ class TALibFeature:
         turn_col = 'turn' if 'turn' in df.columns else 'Turnover'
         pct_chg_col = 'pctChg' if 'pctChg' in df.columns else 'pct_chg'
         amount_col = 'amount' if 'amount' in df.columns else 'Amount'
+        factor_col = 'factor' if 'factor' in df.columns else 'Factor'
+        totalShare_col = 'totalShare' if 'totalShare' in df.columns else 'TotalShare'
+        
+        ## 市值因子
+        features['SIZE'] = np.log(df[close_col] * df[totalShare_col] / df[factor_col])
+        
 
         # EMA,Exponential Moving Average （指数移动平均线）
         for period in self.feature_functions['EMA']['timeperiod']:
@@ -507,46 +552,54 @@ class TALibFeature:
         for period in self.feature_functions['VAR']['timeperiod']:
             features[f'VAR_{period}'] = talib.VAR(df[close_col], timeperiod=period)
         
-        features['TURN_RATE_LN'] = np.log(df[turn_col]+0.000001)
+        # ## beta 指标,
+        # comm_dates = df.index
+        # aligned_index_df = self.index_df.loc[comm_dates]
+        # aligned_index_df.fillna(0, inplace=True)
+        # features['BETA'] = talib.BETA(df[pct_chg_col], aligned_index_df[pct_chg_col], timeperiod=40)
+    
         
-        # Turnover Rate 换手率相关指标
+        ## Amount，成交量相关指标
+        df['TURN_RATE_LN'] = np.log(df[turn_col]+0.00001)
+        turn_ln_col = 'TURN_RATE_LN'
+        ## AMOUNT_LN, 成交量的对数
+        features[turn_ln_col] = df[turn_ln_col]
+        
+        ## Math, 数学运算
+        ## TURN_MAX, 成交量的对数的最大值
+        for period in self.feature_functions['TURN_MAX']['timeperiod']:
+            features[f'TURN_MAX_{period}'] = talib.MAX(df[turn_ln_col], timeperiod=period)
+        
+        ## TURN_MIN, 成交量的对数的最小值
+        for period in self.feature_functions['TURN_MIN']['timeperiod']:
+            features[f'TURN_MIN_{period}'] = talib.MIN(df[turn_ln_col], timeperiod=period)
+        
+        ## TURN_STD, 成交量的对数的标准差
+        for period in self.feature_functions['TURN_STD']['timeperiod']:
+            features[f'TURN_STD_{period}'] = talib.STDDEV(df[turn_ln_col], timeperiod=period)
+            
+        # EMA
         for period in self.feature_functions['TURN_RATE_EMA']['timeperiod']:
-            features[f'TURN_RATE_EMA_{period}'] = talib.EMA(df[turn_col], timeperiod=period)
-
-        ## Turnover Rate MIX, 将日、周、月换手率的加权平均值作为新特征
-        features['TURN_RATE_MIX'] = df[turn_col]*0.35 + features['TURN_RATE_5']*0.35 + features['TURN_RATE_20']*0.3
+            features[f'TURN_RATE_EMA_{period}'] = talib.EMA(df[turn_ln_col], timeperiod=period)
 
         ## Turnover Rate ROC
         for period in self.feature_functions['TURN_ROC']['timeperiod']:
-            features[f'TURN_ROC_{period}'] = talib.ROC(df[turn_col], timeperiod=period)
+            features[f'TURN_ROC_{period}'] = talib.ROC(df[turn_ln_col], timeperiod=period)
 
         ## Turnover Rate SLOPE
         for period in self.feature_functions['TURN_SLOPE']['timeperiod']:
-            features[f'TURN_SLOPE_{period}'] = talib.LINEARREG_SLOPE(df[turn_col], timeperiod=period)
+            features[f'TURN_SLOPE_{period}'] = talib.LINEARREG_SLOPE(df[turn_ln_col], timeperiod=period)
         
         ## Turnover Rate RSI
         for period in self.feature_functions['TURN_RSI']['timeperiod']:
-            features[f'TURN_RSI_{period}'] = talib.RSI(df[turn_col], timeperiod=period)
-        
-        ## Turnover Rate ATX
-        for period in self.feature_functions['TURN_ATX']['timeperiod']:
-            features[f'TURN_ATX_{period}'] = talib.ATR(df[turn_col], timeperiod=period)
-        
-        ## Turnover Rate ADX
-        for period in self.feature_functions['TURN_ADX']['timeperiod']:
-            features[f'TURN_ADX_{period}'] = talib.ADX(df[turn_col], timeperiod=period)
-        
+            features[f'TURN_RSI_{period}'] = talib.RSI(df[turn_ln_col], timeperiod=period)
+          
         ## Turnover Rate TSF
         for period in self.feature_functions['TURN_TSF']['timeperiod']:
-            features[f'TURN_TSF_{period}'] = talib.TSF(df[turn_col], timeperiod=period)
+            features[f'TURN_TSF_{period}'] = talib.TSF(df[turn_ln_col], timeperiod=period)
             
 
-        ## beta 指标,
-        comm_dates = df.index
-        aligned_index_df = self.index_df.loc[comm_dates]
-        aligned_index_df.fillna(0, inplace=True)
-        features['BETA'] = talib.BETA(df[pct_chg_col], aligned_index_df[pct_chg_col], timeperiod=40)
-        
+            
         ## Amount，成交量相关指标
         df['AMOUNT_LN'] = np.log(df[amount_col]+1)
         amount_ln_col = 'AMOUNT_LN'
@@ -649,12 +702,12 @@ class TALibFeature:
 
         ##计算横截面特征，需要先计算全局数据
         self.pre_process_slice_features(stock_data)
-
         # 处理每个CSV文件
+        feature_names = set()
         for file_name, df in tqdm(stock_data.items(), desc="Process stock data...", unit="file"):
             code = file_name.split('.')[0]
             try:
-                # 生成新特征
+            # 生成新特征
                 new_features = self.generate_single_stock_features(df)
                 slice_features = self.generate_slice_features(code)
 
@@ -667,8 +720,21 @@ class TALibFeature:
                 result.to_csv(output_path)
                 #print(f"Successfully processed {file_name}")
 
+                # 收集特征名称
+                feature_names.update(new_features.columns)
+                feature_names.update(slice_features.columns)
+
             except Exception as e:
                 print(f"Error processing {file_name}: {str(e)}")
+
+        # 输出特征名称到文件
+        with open(Path(output_dir) / 'feature_names.txt', 'w') as f:
+            f.write('###fields:\n')
+            for feature_name in sorted(feature_names):
+                f.write(f"'{feature_name}',\n")
+            f.write('###names:\n')
+            for feature_name in sorted(feature_names):
+                f.write(f"'${feature_name}'\n")
 
         for file_name, df in tqdm(non_stock_data.items(), desc="Process non-stock data...", unit="file"):
             # 仅保存沪深300的数据
@@ -678,10 +744,16 @@ class TALibFeature:
 
 def __test__():
     # 测试特征生成器
-    basic_info_path = '/home/godlike/project/GoldSparrow/Day_Data/Day_data/qlib_data/basic_info.csv'
+    #basic_info_path = '/home/godlike/project/GoldSparrow/Day_Data/Day_data/qlib_data/basic_info.csv'
+    basic_info_path = '/root/autodl-tmp/GoldSparrow/Day_data/qlib_data/basic_info.csv'
+    
     feature_generator = TALibFeature(basic_info_path=basic_info_path,time_range = 5)
-    in_folder = '/home/godlike/project/GoldSparrow/Day_Data/Day_data/test_raw'
-    out_folder = '/home/godlike/project/GoldSparrow/Day_Data/Day_data/test_raw_ta'
+    #in_folder = '/home/godlike/project/GoldSparrow/Day_Data/Day_data/test_raw'
+    #out_folder = '/home/godlike/project/GoldSparrow/Day_Data/Day_data/test_raw_ta'
+    
+    in_folder = '/root/autodl-tmp/GoldSparrow/Day_data/test_raw'
+    out_folder = '/root/autodl-tmp/GoldSparrow/Day_data/test_raw_ta'
+    
     feature_generator.process_directory(in_folder, out_folder)
 
 if __name__ == '__main__':
