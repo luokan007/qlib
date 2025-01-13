@@ -589,7 +589,7 @@ class DataManager:
 
         if use_cached_basic_info:
             self._basic_info = pd.read_csv(
-                f"{self._qlib_data_path}/basic_info.csv", index_col=0
+                f"{self._qlib_data_path}/basic_info.csv", index_col=12
             )
         else:
             self._basic_info = (

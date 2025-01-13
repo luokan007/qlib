@@ -329,7 +329,7 @@ class TALibFeature:
         rank_series = self.rank_df.loc[(slice(None), code), ['rank']]
         rank_series = rank_series.reset_index(level='code', drop=True)
 
-        features['RANK'] = np.log(rank_series['rank'] / self.effective_stock_count_df['count'])
+        features['RANK'] = np.log((rank_series['rank'] + self.effective_stock_count_df['count'] )/ self.effective_stock_count_df['count'])
         #print(features['RANK'])
 
         return pd.DataFrame(features, index=df.index)
@@ -425,8 +425,10 @@ class TALibFeature:
         factor_col = 'factor' if 'factor' in df.columns else 'Factor'
         totalShare_col = 'totalShare' if 'totalShare' in df.columns else 'TotalShare'
         
+        df[factor_col] = df[factor_col].ffill().fillna(1)
+        
         ## 市值因子
-        features['SIZE'] = np.log(df[close_col] * df[totalShare_col] / df[factor_col])
+        features['SIZE'] = np.log(df[close_col] * (df[totalShare_col]+1) / df[factor_col])
         
 
         # EMA,Exponential Moving Average （指数移动平均线）

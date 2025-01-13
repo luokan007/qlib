@@ -35,7 +35,7 @@ result.set_index('code', inplace=True, verify_integrity=True)
 #print(result)
 
 # 结果集输出到csv文件
-result.to_csv("/home/godlike/project/GoldSparrow/Meta_Data/stock_basic.csv", encoding="utf8", index=True)
+result.to_csv("/root/autodl-tmp/GoldSparrow/Day_data/Meta_Data/stock_basic.csv", encoding="utf8", index=True)
 
 
 # 登出系统

@@ -34,7 +34,7 @@ pool = 'csi300'
 
 train = ('2008-01-01','2016-12-31')
 valid = ('2017-01-01','2019-12-31')
-test = ('2020-01-01', '2024-12-18')
+test = ('2020-01-01', '2025-01-10')
 model_type = 'lstm' # 模型类型
 
 
@@ -111,7 +111,7 @@ if early_stopping == False: # 若使用不带早停的模型，如线性回归�
 if early_stopping == True: # 若使用带早停的模型，如线LGBModel
     if model_type == "lstm":
         model = LSTM(loss = "mse", 
-                d_feat = 236,
+                d_feat = 313,
                 hidden_size=64,
                 num_layers=2,
                 dropout=0,
@@ -122,7 +122,7 @@ if early_stopping == True: # 若使用带早停的模型，如线LGBModel
                 metric="loss",
                 GPU=0)
     elif model_type == "alstm":
-        model = ALSTM(d_feat=236,
+        model = ALSTM(d_feat=313,
                 hidden_size=64,
                 num_layers=2,
                 dropout=0,
@@ -162,11 +162,9 @@ csv_path = os.path.join(output_dir, 'pred.csv')
 pkl_path = os.path.join(output_dir, 'pred.pkl')
 
 # 保存文件
-pred.reset_index().to_csv(csv_path, index=False)
 pred.to_pickle(pkl_path)
-
+pred.reset_index().to_csv(csv_path, index=False)
 print(f"预测结果已保存至:\n- {csv_path}\n- {pkl_path}")
-
 
 ## 提取label文件，计算ic/icir/long precision/short precision
 
@@ -177,6 +175,7 @@ print(label)
 from eval_model import MyEval
 eval = MyEval.from_dataframe(pred, label)
 print(eval.eval())
+
 
 
 
