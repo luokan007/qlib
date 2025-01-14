@@ -731,12 +731,13 @@ class TALibFeature:
 
         # 输出特征名称到文件
         with open(Path(output_dir) / 'feature_names.txt', 'w') as f:
-            f.write('###fields:\n')
-            for feature_name in sorted(feature_names):
-                f.write(f"'{feature_name}',\n")
+            f.write("feature count: %d\n" % len(feature_names))
             f.write('###names:\n')
             for feature_name in sorted(feature_names):
-                f.write(f"'${feature_name}'\n")
+                f.write(f"'{feature_name}',\n")
+            f.write('###fields:\n')
+            for feature_name in sorted(feature_names):
+                f.write(f"'${feature_name}',\n")
 
         for file_name, df in tqdm(non_stock_data.items(), desc="Process non-stock data...", unit="file"):
             # 仅保存沪深300的数据
