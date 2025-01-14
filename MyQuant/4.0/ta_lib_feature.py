@@ -577,8 +577,8 @@ class TALibFeature:
             features[f'TURN_MIN_{period}'] = talib.MIN(df[turn_ln_col], timeperiod=period)
         
         ## TURN_STD, 成交量的对数的标准差
-        for period in self.feature_functions['TURN_STD']['timeperiod']:
-            features[f'TURN_STD_{period}'] = talib.STDDEV(df[turn_ln_col], timeperiod=period)
+        #for period in self.feature_functions['TURN_STD']['timeperiod']:
+        #    features[f'TURN_STD_{period}'] = talib.STDDEV(df[turn_ln_col], timeperiod=period)
             
         # EMA
         for period in self.feature_functions['TURN_RATE_EMA']['timeperiod']:
@@ -618,8 +618,8 @@ class TALibFeature:
             features[f'AMT_MIN_{period}'] = talib.MIN(df[amount_ln_col], timeperiod=period)
         
         ## AMT_STD, 成交量的对数的标准差
-        for period in self.feature_functions['AMT_STD']['timeperiod']:
-            features[f'AMT_STD_{period}'] = talib.STDDEV(df[amount_ln_col], timeperiod=period)
+        #for period in self.feature_functions['AMT_STD']['timeperiod']:
+        #    features[f'AMT_STD_{period}'] = talib.STDDEV(df[amount_ln_col], timeperiod=period)
         
         ## Overlap/Momentum/Statistics
         ## AMT_EMA
