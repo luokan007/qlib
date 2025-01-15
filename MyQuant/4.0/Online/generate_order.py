@@ -1,12 +1,15 @@
 """_summary_
 """
 import os
+import json
 import pandas as pd
 import math
 import csv
 from pathlib import Path
 from typing import Union
 from datetime import datetime
+import qlib
+from qlib.data import D 
 
 
 class GenerateOrder:
@@ -15,15 +18,19 @@ class GenerateOrder:
         pred_df,
         top_k = 50,
         n_drop = 5,
+        provider_uri = None,
         working_dir = "/root/autodl-tmp/GoldSparrow/Day_data/Order/",
+        stock_basic_csv = "/root/autodl-tmp/GoldSparrow/Day_data/qlib/stock_basic_info.csv",
         position_csv ="position.csv",
         buy_order_csv = "buy.csv",
         sell_order_csv = "sell.csv"
         ):
         self.pred_df = pred_df
         self.working_dir = working_dir
+        self.stock_basic_csv = stock_basic_csv
         self.top_k = top_k
         self.n_drop = n_drop
+        self.provider_uri = provider_uri
         self.position_csv = position_csv
         self.buy_order_csv = buy_order_csv
         self.sell_order_csv = sell_order_csv
@@ -32,7 +39,9 @@ class GenerateOrder:
         self.risk_degree = 0.95
         self.stamp_duty = 0.001 #印花税率
         self.commission = 0.0005 # 佣金率
-        self.cash = 57341
+        self.cash = 10000000.0
+        
+        qlib.init(provider_uri=provider_uri, region="cn")
          
     def generate_order_csv(self):
         """_summary_
@@ -110,17 +119,18 @@ class GenerateOrder:
         
         # 提取ohlc行情数据到df
         changed_stock = buy.tolist() + sell.tolist()
-        #print(changed_stock)
+        print(changed_stock)
         stock_ohlc_df = D.features(instruments= changed_stock,
                         fields=['$close', '$factor'],
                         start_time=latest_date,
-                        end_time=latest_date)
+                        end_time=latest_date,
+                        freq="day")
         ##将ohlc价格修改为除权前的价格
         stock_ohlc_df['$close'] = stock_ohlc_df['$close']/stock_ohlc_df['$factor']
         #print(stock_ohlc_df.head())
         
         ##读取股票中文信息，方便后续的可读性
-        stock_basic_df = pd.read_csv('/home/godlike/project/GoldSparrow/Meta_Data/stock_basic.csv', index_col='code')
+        stock_basic_df = pd.read_csv(self.stock_basic_csv, index_col='code')
         #print(stock_basic_df.head())
         
         sell_order_file_path = os.path.join(order_folder_name, self.sell_order_csv)
@@ -182,17 +192,25 @@ class GenerateOrder:
         
 def main():
     ## 生成订单文件
+    provider_uri = "/root/autodl-tmp/GoldSparrow/Day_data/qlib_data"
+    basic_info_path = "/root/autodl-tmp/GoldSparrow/Day_data/Meta_Data/stock_basic.csv"
+    
     working_dir = "/root/autodl-tmp/GoldSparrow/"
+    config_file_name = 'config_20250114191418.json'
 
     order_folder_name = os.path.join(working_dir, "Order")
     pred_folder_name = os.path.join(working_dir, "Temp_Data")
+    config_file_path = os.path.join(pred_folder_name, config_file_name)
     
     Path(order_folder_name).mkdir(parents=True, exist_ok=True)
     
-    pkl_path = os.path.join(pred_folder_name, "pred.pkl")
+    with open(config_file_path, 'r') as f:
+        config = json.load(f) 
+    pkl_path = config['prediction_pkl']
+    
     pred = pd.read_pickle(pkl_path)
 
-    order = GenerateOrder(working_dir=working_dir, pred_df=pred)
+    order = GenerateOrder(provider_uri = provider_uri ,working_dir=order_folder_name, stock_basic_csv=basic_info_path, pred_df=pred)
     order.generate_order_csv()
 
 

@@ -13,6 +13,7 @@
 #   4. 增加滑点、
 #   5. 改进risk_degree的计算方式
 import os
+import json
 from datetime import datetime
 import pandas as pd
 
@@ -210,14 +211,26 @@ def main():
     # report_file_path = '/home/godlike/project/GoldSparrow/Offline_Report/self_alpha_LSTM_v2.html'
     # output_dir = "/home/godlike/project/GoldSparrow/Temp_Data"
     #provider_uri = "/home/godlike/project/GoldSparrow/Day_Data/Day_data/qlib_data"
-    report_file_path = '/root/autodl-tmp/GoldSparrow/Experiment_Result/self_alpha_ALSTM_v3-5year.html'
-    output_dir = "/root/autodl-tmp/GoldSparrow/Temp_Data"
+     # 配置文件路径
+     
+    work_dir = '/root/autodl-tmp/GoldSparrow/Temp_Data'
     provider_uri = "/root/autodl-tmp/GoldSparrow/Day_data/qlib_data"
     
+    config_file_name = 'config_20250114191418.json'
+    report_file_name = 'report_20250114191418.html'
     
-    pkl_path = os.path.join(output_dir, 'pred.pkl')
-    backtest = BackTest.from_pred_file(provider_uri = provider_uri, pred_file_path = pkl_path,report_name = report_file_path)
+    config_file_path = os.path.join(work_dir, config_file_name)    
+    report_file_path = os.path.join(work_dir, report_file_name)
+    
+    # 读取配置文件
+    with open(config_file_path, 'r') as f:
+        config = json.load(f)
+    
+    # 从配置文件中获取 pkl_path
+    pkl_path = config['prediction_pkl']
+    backtest = BackTest.from_pred_file(provider_uri=provider_uri, pred_file_path=pkl_path, report_name=report_file_path)
     backtest.run()
+    
     # ### 基于1.3版本产生的experiment id的回测
     # report_file_path = '/home/godlike/project/GoldSparrow/Offline_Report/LSTM_benchmark.html'
     # provider_uri = "/home/godlike/project/GoldSparrow/Updated_Stock_Data"
