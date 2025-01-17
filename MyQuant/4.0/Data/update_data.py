@@ -22,6 +22,7 @@ from baostock.data.resultset import ResultData
 import akshare as ak
 
 # from qlib_dump_bin import DumpDataAll
+from ta_lib_feature import TALibFeature
 from mydump_bin import DumpDataAll
 import warnings
 warnings.filterwarnings("ignore")
@@ -37,7 +38,7 @@ def _write_all_text(path: str, text: str) -> None:
         f.write(text)
 
 
-class DataManager:
+class EnhancedDataManager:
     _all_a_shares: List[str]
     _basic_info: pd.DataFrame
     _adjust_factors: pd.DataFrame
@@ -66,7 +67,9 @@ class DataManager:
     def __init__(
         self,
         csv_path: str = None,
+        feature_path: str = None,
         qlib_data_path: str = None,
+        basic_info_path: str = None,
         adjustflag: str = "1",  # "3": 不复权；"1"：后复权； "2"：前复权。
         start_date: str = None,  # 下载数据开始日期，格式如"2015-01-01" ，None从上市日开始
         end_date: str = None,  # 下载数据的结束日期。None则到最近日
@@ -74,9 +77,15 @@ class DataManager:
         max_workers: int = 5,
     ):
         self._csv_path = os.path.expanduser(csv_path)
-        os.makedirs(self._csv_path, exist_ok=True)
+        
+        self._feature_path = os.path.expanduser(feature_path)
+        #删除原有的特征文件夹
+        if os.path.exists(self._feature_path) and os.path.isdir(self._feature_path):
+            shutil.rmtree(self._feature_path)
+        os.makedirs(self._feature_path, exist_ok=True)
 
         self._qlib_data_path = os.path.expanduser(qlib_data_path)
+        self._basic_info_path = os.path.expanduser(basic_info_path)
         self._adjustflag = adjustflag
 
         self._start_date = start_date
@@ -96,6 +105,40 @@ class DataManager:
     @property
     def _a_shares_list_path(self) -> str:
         return f"{self._qlib_data_path}/a_shares_list.txt"
+    
+    def update_time_range(self, input_dir: str):
+        MODE = "create"
+        if not os.path.exists(input_dir):
+            today = datetime.date.today().strftime("%Y-%m-%d")
+            return (MODE, "2008-01-01", today)
+        else:
+            all_start_dates = []
+            all_end_dates = []
+            for file_path in Path(input_dir).glob('*.csv'):
+                df = pd.read_csv(file_path, usecols=["date"])
+                if not df.empty: 
+                    all_start_dates.append(df["date"].min())
+                    all_end_dates.append(df["date"].max())
+            
+            if all_start_dates and all_end_dates:
+                min_existing = min(all_start_dates)
+                max_existing = max(all_end_dates)
+                
+                assert min_existing <= max_existing, "Invalid time range"
+                assert max_existing <= datetime.date.today().strftime("%Y-%m-%d"), "Existing data end date is in the future"
+                
+                today = datetime.date.today().strftime("%Y-%m-%d")
+                if max_existing < today:
+                    max_existing_plus_one = (pd.to_datetime(max_existing) + pd.DateOffset(days=1)).strftime("%Y-%m-%d")
+                    MODE = "update"
+                    return (MODE, max_existing_plus_one, today)
+                elif max_existing == today:
+                    MODE = "skip"
+                    return (MODE, None, None)
+                else:
+                    raise ValueError("Invalid time range")
+            else:
+                raise ValueError("No data found")   
 
     def _load_all_a_shares_base(self) -> None:
         # 从已有股票代码列表文件获取股票代码列表，含历史退市股即可，防止幸存者偏差。最终会与在线拉下来的活跃股求并集
@@ -233,14 +276,16 @@ class DataManager:
                 [[1.0, 1.0, 1.0]], index=pd.Index([start]), columns=self._adjust_columns
             )
         ret_df = self._adjust_factors.xs(code, level="code").astype(float)  # type: ignore
+        #print(ret_df.tail())
         if ret_df.index.max() < self._start_date:##当调整因子的最大日期小于开始日期时，需要补充调整因子
             new_row = pd.DataFrame([[float('nan')] * len(self._adjust_columns)], 
                        index=pd.Index([self._start_date]), 
                        columns=self._adjust_columns)
             ret_df = pd.concat([ret_df, new_row])
             ret_df = ret_df.fillna(method='ffill')
-            
+            #print(ret_df.tail())
         return ret_df
+        #return self._adjust_factors.xs(code, level="code").astype(float)  # type: ignore
 
     def _check_csv_data(self, code: str) -> Tuple[bool, bool, pd.DataFrame]:
         """
@@ -381,7 +426,7 @@ class DataManager:
 
         return seasonal_df
 
-    def _process_stock_data(self, code: str, data: pd.Series) -> None:
+    def _process_stock_data(self, code: str, data: pd.Series, target_folder) -> None:
         """Process stock data for a given code: download daily data, valuation data, and merge them."""
         self._login_baostock()
 
@@ -459,6 +504,7 @@ class DataManager:
                 seasonal_df.index = pd.to_datetime(seasonal_df.index)
                 merge_min_date, merge_max_date = merged_df.index.min(), merged_df.index.max()
                 seasonal_min_date, seasonal_max_date = seasonal_df.index.min(), seasonal_df.index.max()
+                
                 ##细分几种情况
                 if merge_min_date < seasonal_min_date:
                     seasonal_df.loc[merge_min_date] = [float('nan')] * len(seasonal_columns)
@@ -476,45 +522,10 @@ class DataManager:
             seasonal_df = pd.DataFrame(columns=['date', 'epsTTM', 'totalShare', 'liqaShare'])
             seasonal_df = seasonal_df.set_index("date")
             merged_df = pd.merge(merged_df, seasonal_df, how='left', left_index=True, right_index=True)
-            merged_df[seasonal_columns] = merged_df[seasonal_columns].fillna(0)
-        
-        #merged_df[seasonal_columns] = merged_df[seasonal_columns].replace("", "0.").astype(float)
-        
-        # # 5. 下载并合并业绩快报数据————目前还有问题，暂时搁置
-        # performance_df = self._download_performance_data(code)
-        # # Add performance data handling for empty/None cases first
-        # performance_columns = ['performanceExpressTotalAsset',
-        #                         'performanceExpressNetAsset',
-        #                         'performanceExpressEPSChgPct',                                'performanceExpressROEWa',
-        #                         'performanceExpressEPSDiluted',
-        #                         'performanceExpressGRYOY',
-        #                         'performanceExpressOPYOY']
-        # if performance_df is None or performance_df.empty:
-        #     # Create empty DataFrame with required columns filled with 0
-        #     performance_df = pd.DataFrame( 0, index=merged_df.index, columns=performance_columns)
-        # else:
-        #     performance_df = self._convert_performance_to_daily(performance_df)
-            
-        # try:
-        #     merged_df = pd.merge(merged_df, performance_df,
-        #                how='left',
-        #                left_index=True,
-        #                right_index=True)
-        #     # Ensure all performance columns exist and fill NaNs with 0
-        #     for col in performance_columns:
-        #         if col not in merged_df.columns:
-        #             merged_df[col] = 0
-        #         else:
-        #             merged_df[col] = merged_df[col].fillna(method='ffill').fillna(0)
-        # except Exception as e:
-        #     print(f"Failed to merge performance data for {code}: {e}")
-        #     # Add missing columns with 0s if merge fails
-        #     for col in performance_columns:
-        #         if col not in merged_df.columns:
-        #             merged_df[col] = 0
+            merged_df[seasonal_columns] = merged_df[seasonal_columns].fillna(0) #为了避免前向填充的数据被覆盖，这里不再填充
 
         # Step 6: Save the merged data to CSV
-        csv_file_path = f"{self._csv_path}/{code[:2].lower()}{code[-6:]}.csv"
+        csv_file_path = f"{target_folder}/{code[:2].lower()}{code[-6:]}.csv"
         if not merged_df.empty:
             try:
                 merged_df.to_csv(csv_file_path)
@@ -522,49 +533,19 @@ class DataManager:
                 print(f"Failed to save data for {code}: {e}")
 
         #bs.logout()
-    def _download_stock_data(self) -> None:
+    def _download_stock_data(self, target_folder) -> None:
         print("Download stock data")
-        os.makedirs(f"{self._csv_path}", exist_ok=True)
-
-        # 获取目录中已下载csv文件的股票代码列表 qtb add
-        csv_file_list = os.listdir(f"{self._csv_path}")
-        self._code_downloaded = []
-        if not self._overwrite:  # 如果不覆盖已下载的数据，则跳过已下载的
-            code_downloaded = [f[-13:-4] for f in csv_file_list]  # 记录已下载的股票代码列表
-            self._code_downloaded = [c[:2] + "." + c[-6:] for c in code_downloaded]
-        # print(self._code_downloaded)
-        # print([code for code, data in self._basic_info.iterrows() if code not in self._code_downloaded ])
+        os.makedirs(f"{target_folder}", exist_ok=True)
 
         # 多线程下载
         #code=code,	data= code_name	ipoDate	outDate	type	status
         self._parallel_foreach(
              self._process_stock_data,
              [
-                 dict(code=code, data=data)
+                 dict(code=code, data=data, target_folder=target_folder)
                  for code, data in self._basic_info.iterrows()
-                 if code not in self._code_downloaded
              ],
          )
-        #for code, data in self._basic_info.iterrows():
-        #    if code not in self._code_downloaded:
-        #        self._process_stock_data(code,data)
-        
-      
-
-    # def _save_csv_job(self, path: Path) -> None:
-    #     code = path.stem
-    #     code = f"{code[:2].upper()}{code[-6:]}"
-    #     df: pd.DataFrame = pd.read_pickle(path)
-    #     df.rename(columns={"foreAdjustFactor": "factor"}, inplace=True)
-    #     df["code"] = code
-    #     out = Path(self._csv_path) / f"{code}.csv"
-    #     df.to_csv(out)
-
-    # def _save_csv(self) -> None:
-    #     print("Export to csv")
-    #     children = list(Path(f"{self._csv_path}").iterdir())
-    #     self._parallel_foreach(self._save_csv_job,
-    #                            [dict(path=path) for path in children])
 
     @classmethod
     def _result_to_data_frame(cls, res: ResultData) -> pd.DataFrame:
@@ -573,10 +554,10 @@ class DataManager:
             lst.append(res.get_row_data())
         return pd.DataFrame(lst, columns=res.fields)
 
-    def _dump_qlib_data(self) -> None:
+    def _dump_qlib_data(self, csv_folder) -> None:
         print("dump qlib data")
         DumpDataAll(
-            csv_path=self._csv_path,
+            csv_path=csv_folder,
             qlib_dir=self._qlib_data_path,
             max_workers=self._max_workers,
             exclude_fields="date,code",
@@ -603,6 +584,27 @@ class DataManager:
             df[2] = df[2].replace(latest_data, today)
             df.to_csv(p, header=False, index=False, sep="\t")
 
+    def _add_features(self, data_dir, output_dir,basic_info_path):
+        """
+        Add technical analysis features to stock data using TALib
+        
+        Parameters:
+        -----------
+        data_dir : str
+            Directory containing the stock data files
+        output_dir : str
+            Directory to save the processed files with new features
+        """
+        ta_feature_generator = TALibFeature(basic_info_path=basic_info_path,time_range=30)
+
+        if os.path.exists(output_dir) and os.path.isdir(output_dir):
+            # 使用 shutil.rmtree 高效地移除整个目录树
+            shutil.rmtree(output_dir)
+
+        # # 重新创建目录
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
+        ta_feature_generator.process_directory(data_dir, output_dir)
+    
     def fetch_and_save_data(
         self,
         use_cached_basic_info: bool = False,
@@ -628,30 +630,67 @@ class DataManager:
         else:
             self._adjust_factors = self._fetch_adjust_factors()  # 获取所有股票调整因子
 
-        self._download_stock_data()
+        (MODE, start, end ) = self.update_time_range(self._csv_path)    
+        if MODE == "skip":
+            print("Data up to date, skipping download")
+            return
+        elif MODE == "create":
+            self._start_date = start
+            self._end_date = end
+            target_folder = self._csv_path
+            self._download_stock_data(target_folder=target_folder)
+        elif MODE == "update":
+            self._start_date = start
+            self._end_date = end
+            # Create a temporary folder for new data
+            temp_folder = os.path.join(self._csv_path, "temp")
+            if os.path.exists(temp_folder) and os.path.isdir(temp_folder):
+                shutil.rmtree(temp_folder)
+            os.makedirs(temp_folder, exist_ok=True)
 
-        self._dump_qlib_data()
-
-    def init(self, use_cached_basic_info: bool = False, use_cached_adjust_factor: bool = False, stock_list: list = None):
-        if stock_list is None:
-            stock_list = []
-        # 获取活跃股票代码列表合并指数代码列表，放到列表self._all_a_shares
-        self._all_a_shares = stock_list
-        if use_cached_basic_info:
-            self._basic_info = pd.read_csv(
-                f"{self._qlib_data_path}/basic_info.csv", index_col=0
-            )
+            # Download new data to the temporary folder
+            self._download_stock_data(target_folder=temp_folder)
+            self._merge_data(temp_folder=temp_folder, target_folder=self._csv_path)
         else:
-            self._basic_info = (
-                self._fetch_basic_info()
-            )  # 利用_all_a_shares，获取所有股票基本信息，其中也有000300这种指数
-        if use_cached_adjust_factor:
-            self._adjust_factors = pd.read_csv(
-                f"{self._qlib_data_path}/adjust_factors.csv", index_col=[0, 1]
-            )
-        else:
-            self._adjust_factors = self._fetch_adjust_factors()  # 获取所有股票调整因子
+            raise ValueError("Invalid mode")
+        
+        ##生成特征
+        self._add_features(self._csv_path, self._feature_path, self._basic_info_path)
+        
+        ##删除qlib目录下的calendar和features目录
+        shutil.rmtree(f"{self._qlib_data_path}/calendars")
+        shutil.rmtree(f"{self._qlib_data_path}/features")
+        
+        ##保存qlib数据
+        self._dump_qlib_data(self._feature_path)
 
+    def _merge_data(self, temp_folder: str, target_folder: str) -> None:
+        """
+        Merge data from the temporary folder to the target folder
+        """
+        print("Merging data...")
+        with tqdm(total=len(list(Path(temp_folder).glob('*.csv')))) as pbar:
+            for file_path in Path(temp_folder).glob('*.csv'):
+                target_file_path = Path(target_folder) / file_path.name
+                temp_df = pd.read_csv(file_path)
+                
+                if target_file_path.exists():
+                    target_df = pd.read_csv(target_file_path)
+                    merged_df = pd.concat([target_df, temp_df]).drop_duplicates(subset=['date']).sort_values(by='date')
+                    
+                    ##seasoanl columns需要前向填充
+                    seasonal_columns = ['epsTTM', 'totalShare', 'liqaShare']
+                    merged_df[seasonal_columns] = merged_df[seasonal_columns].fillna(method='ffill')
+                else:
+                    merged_df = temp_df
+                
+                merged_df.to_csv(target_file_path, index=False)
+                pbar.update(1)
+
+        ## Remove the temporary folder
+        print("Removing temporary folder")
+        shutil.rmtree(temp_folder)
+            
 
 if __name__ == "__main__":
     
@@ -659,15 +698,14 @@ if __name__ == "__main__":
     today = str(datetime.date.today())
     print(f"today: {today}")
 
-    dm = DataManager(
+    dm = EnhancedDataManager(
         #csv_path=r"/home/godlike/project/GoldSparrow/Day_Data/Day_data/Raw",
         #qlib_data_path=r"/home/godlike/project/GoldSparrow/Day_Data/Day_data/qlib_data",        
 
         csv_path=r"/root/autodl-tmp/GoldSparrow/Day_data/Raw",
+        feature_path=r"/root/autodl-tmp/GoldSparrow/Day_data/Merged_talib",
         qlib_data_path=r"/root/autodl-tmp/GoldSparrow/Day_data/qlib_data",
-
-        start_date="2024-01-01",  # 下载数据开始日期，格式如"2015-01-01" ，None从上市日开始
-        end_date="2025-01-05",  # 下载数据的结束日期。None则到最近日
+        basic_info_path='/root/autodl-tmp/GoldSparrow/Day_data/qlib_data/basic_info.csv',
         #  adjustflag：复权方式，字符串."3": 不复权；"1"：后复权；"2"：前复权。
         #  BaoStock提供的是涨跌幅复权算法复权因子，具体介绍见：BaoStock复权因子简介。
         adjustflag="1",
@@ -675,7 +713,7 @@ if __name__ == "__main__":
         max_workers=32,
     )
 
-    useCache = False  # 使用缓存股票基本信息，和调整因子。入股股票代码中的代码在缓存基本信息中不存在，则不会下载其行情数据
+    useCache = True  # 使用缓存股票基本信息，和调整因子。入股股票代码中的代码在缓存基本信息中不存在，则不会下载其行情数据
     dm.fetch_and_save_data(
         use_cached_basic_info=useCache, use_cached_adjust_factor=useCache
     )

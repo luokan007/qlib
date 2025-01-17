@@ -428,32 +428,32 @@ class TALibFeature:
         df[factor_col] = df[factor_col].ffill().fillna(1)
         
         ## 市值因子
-        features['SIZE'] = np.log(df[close_col] * (df[totalShare_col]+1) / df[factor_col])
+        features['SIZE'] = np.log(df[open_col] * (df[totalShare_col]+1) / df[factor_col])
         
 
         # EMA,Exponential Moving Average （指数移动平均线）
         for period in self.feature_functions['EMA']['timeperiod']:
-            features[f'EMA_{period}'] = talib.EMA(df[close_col], timeperiod=period)
+            features[f'EMA_{period}'] = talib.EMA(df[open_col], timeperiod=period)
 
         # SAR,Parabolic SAR （抛物线转向）
         features['SAR'] = talib.SAR(df[high_col], df[low_col])
 
         # KAMA, Kaufman Adaptive Moving Average
         for period in self.feature_functions['KAMA']['timeperiod']:
-            features[f'KAMA_{period}'] = talib.KAMA(df[close_col], timeperiod=period)
+            features[f'KAMA_{period}'] = talib.KAMA(df[open_col], timeperiod=period)
 
         # TEMA, 
         for period in self.feature_functions['TEMA']['timeperiod']:
-            features[f'TEMA_{period}'] = talib.TEMA(df[close_col], timeperiod=period)
+            features[f'TEMA_{period}'] = talib.TEMA(df[open_col], timeperiod=period)
 
         # TRIMA
         for period in self.feature_functions['TRIMA']['timeperiod']:
-            features[f'TRIMA_{period}'] = talib.TRIMA(df[close_col], timeperiod=period)
+            features[f'TRIMA_{period}'] = talib.TRIMA(df[open_col], timeperiod=period)
             
         
         # ADX, Average Directional Movement Index
         for period in self.feature_functions['ADX']['timeperiod']:
-            features[f'ADX_{period}'] = talib.ADX(df[high_col], df[low_col], df[close_col], timeperiod=period)
+            features[f'ADX_{period}'] = talib.ADX(df[high_col], df[low_col], df[open_col], timeperiod=period)
 
         # APO
         features['APO'] = talib.APO(df[close_col])
@@ -467,14 +467,14 @@ class TALibFeature:
 
         # CCI, Commodity Channel Index
         for period in self.feature_functions['CCI']['timeperiod']:
-            features[f'CCI_{period}'] = talib.CCI(df[high_col], df[low_col], df[close_col], timeperiod=period)
+            features[f'CCI_{period}'] = talib.CCI(df[high_col], df[low_col], df[open_col], timeperiod=period)
         
         # CMO
         for period in self.feature_functions['CMO']['timeperiod']:
-            features[f'CMO_{period}'] = talib.CMO(df[close_col], timeperiod=period)
+            features[f'CMO_{period}'] = talib.CMO(df[open_col], timeperiod=period)
         
         # MACD, Moving Average Convergence/Divergence
-        macd, signal, hist = talib.MACD(df[close_col],
+        macd, signal, hist = talib.MACD(df[open_col],
                                       fastperiod=self.feature_functions['MACD']['fastperiod'],
                                       slowperiod=self.feature_functions['MACD']['slowperiod'],
                                       signalperiod=self.feature_functions['MACD']['signalperiod'])
@@ -487,72 +487,72 @@ class TALibFeature:
 
         # MOM,Momentum
         for period in self.feature_functions['MOM']['timeperiod']:
-            features[f'MOM_{period}'] = talib.MOM(df[close_col], timeperiod=period)
+            features[f'MOM_{period}'] = talib.MOM(df[open_col], timeperiod=period)
 
         # MFI
         for period in self.feature_functions['MFI']['timeperiod']:
-            features[f'MFI_{period}'] = talib.MFI(df[high_col], df[low_col], df[close_col], df[volume_col], timeperiod=period)
+            features[f'MFI_{period}'] = talib.MFI(df[high_col], df[low_col], df[open_col], df[volume_col], timeperiod=period)
 
         #ROC
         for period in self.feature_functions['ROC']['timeperiod']:
-            features[f'ROC_{period}'] = talib.ROC(df[close_col], timeperiod=period)
+            features[f'ROC_{period}'] = talib.ROC(df[open_col], timeperiod=period)
 
         # RSI,Relative Strength Index （相对强弱指标）
         for period in self.feature_functions['RSI']['timeperiod']:
-            features[f'RSI_{period}'] = talib.RSI(df[close_col], timeperiod=period)
+            features[f'RSI_{period}'] = talib.RSI(df[open_col], timeperiod=period)
             
         # STOCHF
-        fastk, fastd = talib.STOCHF(df[high_col], df[low_col], df[close_col])
+        fastk, fastd = talib.STOCHF(df[high_col], df[low_col], df[open_col])
         features['STOCHF_k'] = fastk
         features['STOCHF_d'] = fastd
         
         #STOCHRSI
-        stochrsi_fastk, stochrsi_fastd = talib.STOCHRSI(df[close_col])
+        stochrsi_fastk, stochrsi_fastd = talib.STOCHRSI(df[open_col])
         features['STOCHRSI_k'] = stochrsi_fastk
         features['STOCHRSI_d'] = stochrsi_fastd
         
         #TRIX
         for period in self.feature_functions['TRIX']['timeperiod']:
-            features[f'TRIX_{period}'] = talib.TRIX(df[close_col], timeperiod=period)
+            features[f'TRIX_{period}'] = talib.TRIX(df[open_col], timeperiod=period)
 
 
         # ULTOSC,Ultimate Oscillator
-        features['ULTOSC'] = talib.ULTOSC(df[high_col], df[low_col], df[close_col])
+        features['ULTOSC'] = talib.ULTOSC(df[high_col], df[low_col], df[open_col])
 
         # WILLR,Williams' %R
         for period in self.feature_functions['WILLR']['timeperiod']:
-            features[f'WILLR_{period}'] = talib.WILLR(df[high_col], df[low_col], df[close_col], timeperiod=period)
+            features[f'WILLR_{period}'] = talib.WILLR(df[high_col], df[low_col], df[open_col], timeperiod=period)
 
         # AD, Chaikin A/D Line
-        features['AD'] = talib.AD(df[high_col], df[low_col], df[close_col], df[volume_col])
+        features['AD'] = talib.AD(df[high_col], df[low_col], df[open_col], df[volume_col])
 
         # ADOSC, Chaikin A/D Oscillator
-        features['ADOSC'] = talib.ADOSC(df[high_col], df[low_col], df[close_col], df[volume_col], 
+        features['ADOSC'] = talib.ADOSC(df[high_col], df[low_col], df[open_col], df[volume_col], 
                                         fastperiod=self.feature_functions['ADOSC']['fastperiod'], 
                                         slowperiod=self.feature_functions['ADOSC']['slowperiod'])
         # 生成OBV
-        features['OBV'] = talib.OBV(df[close_col], df[volume_col])
+        features['OBV'] = talib.OBV(df[open_col], df[volume_col])
 
         # ATR, Average True Range
         for period in self.feature_functions['ATR']['timeperiod']:
-            features[f'ATR_{period}'] = talib.ATR(df[high_col], df[low_col], df[close_col], timeperiod=period)
+            features[f'ATR_{period}'] = talib.ATR(df[high_col], df[low_col], df[open_col], timeperiod=period)
 
         # NATR, Normalized Average True Range
         for period in self.feature_functions['NATR']['timeperiod']:
-            features[f'NATR_{period}'] = talib.NATR(df[high_col], df[low_col], df[close_col], timeperiod=period)
+            features[f'NATR_{period}'] = talib.NATR(df[high_col], df[low_col], df[open_col], timeperiod=period)
 
         # TRANGE, True Range
-        features['TRANGE'] = talib.TRANGE(df[high_col], df[low_col], df[close_col])
+        features['TRANGE'] = talib.TRANGE(df[high_col], df[low_col], df[open_col])
 
         # LINEARREG_SLOPE - v4.1, Linear Regression Slope
         for period in self.feature_functions['LINEARREG_SLOPE']['timeperiod']:
-            features[f'LINEARREG_SLOPE_{period}'] = talib.LINEARREG_SLOPE(df[close_col], timeperiod=period)
+            features[f'LINEARREG_SLOPE_{period}'] = talib.LINEARREG_SLOPE(df[open_col], timeperiod=period)
         
         for period in self.feature_functions['TSF']['timeperiod']:
-            features[f'TSF_{period}'] = talib.TSF(df[close_col], timeperiod=period)
+            features[f'TSF_{period}'] = talib.SUB(df[open_col], talib.TSF(df[open_col], timeperiod=period))
         
         for period in self.feature_functions['VAR']['timeperiod']:
-            features[f'VAR_{period}'] = talib.VAR(df[close_col], timeperiod=period)
+            features[f'VAR_{period}'] = talib.VAR(df[open_col], timeperiod=period)
         
         # ## beta 指标,
         # comm_dates = df.index
@@ -598,7 +598,7 @@ class TALibFeature:
           
         ## Turnover Rate TSF
         for period in self.feature_functions['TURN_TSF']['timeperiod']:
-            features[f'TURN_TSF_{period}'] = talib.TSF(df[turn_ln_col], timeperiod=period)
+            features[f'TURN_TSF_{period}'] = talib.SUB(df[turn_ln_col], talib.TSF(df[turn_ln_col], timeperiod=period))
             
 
             
@@ -644,7 +644,7 @@ class TALibFeature:
         
         ## AMT_TSF
         for period in self.feature_functions['AMT_TSF']['timeperiod']:
-            features[f'AMT_TSF_{period}'] = talib.TSF(df[amount_ln_col], timeperiod=period)
+            features[f'AMT_TSF_{period}'] = talib.SUB( df[amount_ln_col] ,talib.TSF(df[amount_ln_col], timeperiod=period))
         
         ## AMT_VAR
         for period in self.feature_functions['AMT_VAR']['timeperiod']:

@@ -217,7 +217,7 @@ class MyAlpha158Ext(DataHandlerLP):
         # fields += ['Ref($turn, 1)/$turn', '$turn', '$peTTM', '$pbMRQ', '$psTTM', '$pcfNcfTTM', '$pbMRQ']
         # names += ['TURNOVER1', 'TURNOVER0', 'PETTM', 'PBMQR', 'PSTTM', 'PCFNCF', 'PBMQR']
         
-        ## v4.1, totally 305 features
+        ## v4.1, totally 305 features: 143(ta-lib) + 158(初始的) + 4（（turn / peTTM / pbMRQ / psTTM））
         fields += ['$AD',
                     '$ADOSC',
                     '$ADX_14',
@@ -726,4 +726,4 @@ class MyAlpha158Ext(DataHandlerLP):
         return fields, names
 
     def get_label_config(self):
-        return ["Ref($close, -2)/Ref($close, -1) - 1"], ["LABEL0"]
+        return ["Ref($open, -2)/Ref($open, -1) - 1"], ["LABEL0"]
