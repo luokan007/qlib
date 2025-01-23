@@ -192,21 +192,21 @@ class GenerateOrder:
         
 def main():
     ## 生成订单文件
-    provider_uri = "/root/autodl-tmp/GoldSparrow/Day_data/qlib_data"
     basic_info_path = "/root/autodl-tmp/GoldSparrow/Day_data/Meta_Data/stock_basic.csv"
     
     working_dir = "/root/autodl-tmp/GoldSparrow/"
     config_file_name = 'config_20250114191418.json'
 
     order_folder_name = os.path.join(working_dir, "Order")
-    pred_folder_name = os.path.join(working_dir, "Temp_Data")
-    config_file_path = os.path.join(pred_folder_name, config_file_name)
+    config_folder_name = os.path.join(working_dir, "Temp_Data")
+    config_file_path = os.path.join(config_folder_name, config_file_name)
     
     Path(order_folder_name).mkdir(parents=True, exist_ok=True)
     
     with open(config_file_path, 'r') as f:
         config = json.load(f) 
     pkl_path = config['prediction_pkl']
+    provider_uri = config['provider_uri']    
     
     pred = pd.read_pickle(pkl_path)
 
