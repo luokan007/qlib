@@ -86,7 +86,7 @@ class TALibFeature:
             
         }
 
-        self.minimum_data_length = 700 # 最小数据长度,去除交易时间过短的数据，700为三年的时长
+        self.minimum_data_length = 300 # 最小数据长度,去除交易时间过短的数据，700为三年的时长
 
         self.median_df = pd.DataFrame()
         self.amount_df = pd.DataFrame()

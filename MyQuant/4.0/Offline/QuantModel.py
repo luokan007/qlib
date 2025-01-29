@@ -91,13 +91,13 @@ class QuantModel:
         
         # 推理处理器，RobustZScoreNorm要算fit_start_time和fit_end_time间的因子均值和方差，
         # 然后因子要减去均值除以标准差就行正则化
-        # infer_processors = [RobustZScoreNorm(fit_start_time=fit_start_time, fit_end_time=fit_end_time, 
-        #                                     fields_group='feature',
-        #                                     clip_outlier=True),Fillna(fields_group='feature')]
-
         infer_processors = [RobustZScoreNorm(fit_start_time=fit_start_time, fit_end_time=fit_end_time, 
-                                              fields_group='feature',
-                                              clip_outlier=True),DropnaProcessor(fields_group='feature')]
+                                            fields_group='feature',
+                                            clip_outlier=True),Fillna(fields_group='feature')]
+
+        # infer_processors = [RobustZScoreNorm(fit_start_time=fit_start_time, fit_end_time=fit_end_time, 
+        #                                       fields_group='feature',
+        #                                       clip_outlier=True),DropnaProcessor(fields_group='feature')]
         learn_processors = [DropnaLabel(),CSRankNorm(fields_group='label')]
         filter_rule = None # ExpressionDFilter(rule_expression='EMA($close, 10)<10')
         handler =MyAlpha158Ext(instruments=pool,
@@ -235,10 +235,10 @@ config_gbdt = {
 # quant_model_lstm.train_evaluate()
 #quant_model_lstm.online_predict()
 
-# quant_model_alstm = QuantModel(config_alstm, config_alstm['output_dir'])
-# quant_model_alstm.train_evaluate()
+quant_model_alstm = QuantModel(config_alstm, config_alstm['output_dir'])
+quant_model_alstm.train_evaluate()
 # #quant_model_alstm.online_predict()
 
 ##使用GBDT model输出特征的重要性
-quant_model_gbdt = QuantModel(config_gbdt, config_gbdt['output_dir'])
-quant_model_gbdt.get_feature_importance()
+# quant_model_gbdt = QuantModel(config_gbdt, config_gbdt['output_dir'])
+# quant_model_gbdt.get_feature_importance()
