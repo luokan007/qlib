@@ -215,9 +215,9 @@ def main():
      
     work_dir = '/root/autodl-tmp/GoldSparrow/Temp_Data'
     provider_uri = "/root/autodl-tmp/GoldSparrow/Day_data/qlib_data"
-    
-    config_file_name = 'config_20250129174306.json'
-    report_file_name = 'report_20250129174306.html'
+
+    config_file_name = 'config_20250129215017.json'
+    report_file_name = 'report_20250129215017.html'
     
     config_file_path = os.path.join(work_dir, config_file_name)    
     report_file_path = os.path.join(work_dir, report_file_name)

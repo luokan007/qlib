@@ -9,6 +9,7 @@ from qlib.data.dataset.handler import DataHandlerLP
 from qlib.data.dataset.processor import CSZScoreNorm, DropnaProcessor, RobustZScoreNorm, Fillna,DropnaLabel,CSRankNorm
 from qlib.contrib.model.pytorch_lstm import LSTM
 from qlib.contrib.model.pytorch_alstm_ts import ALSTM
+from qlib.contrib.model.gbdt import LGBModel
 from qlib.contrib.data.handler import MyAlpha158Ext
 from qlib.contrib.data.handler import Alpha158
 from eval_model import MyEval
@@ -48,7 +49,7 @@ class QuantModel:
         
         model_type = self.config['model_type']
         
-        if model_type == "lstm":
+        if model_type == "lstm" or model_type == "gbdt":
             # 提取label文件，计算ic/icir/long precision/short precision
             params = dict(segments="test", col_set="label", data_key=DataHandlerLP.DK_R)
             label = self.dataset.prepare(**params)
@@ -58,6 +59,7 @@ class QuantModel:
         elif model_type == "alstm":
             ## alstm暂时不支持计算
             eval_result = {}
+            
         else:
             raise ValueError(f"model_type={model_type} not supported")
         #print(eval_result)
@@ -122,8 +124,25 @@ class QuantModel:
         elif model_type.lower() == "alstm":
             step_len = self.config['model_step_len']
             self.dataset = TSDatasetH(step_len = step_len, handler = handler, segments={"train": train,"valid": valid, "test":test})
+        if model_type.lower() == "gbdt":
+            self.dataset = DatasetH(handler = handler, segments={"train": train,"valid": valid, "test":test})
         else:
             raise ValueError(f"model_type={model_type} not supported")
+    
+    def get_feature_importance(self):
+        self._prepare_data()
+        self._initialize_model()
+        self.model.fit(dataset=self.dataset)
+        
+        _importance = self.model.get_feature_importance()
+        
+        
+        fea_expr, fea_name = self.dataset.handler.get_feature_config() # 获取特征表达式，特征名字
+        # 特征名，重要性值的对照字典
+        feature_importance = {fea_name[int(i.split('_')[1])]: v for i,v in _importance.items()}
+        print(feature_importance)
+
+        
 
 
     def _initialize_model(self):
@@ -133,6 +152,8 @@ class QuantModel:
             self.model = LSTM(**model_params)
         elif model_type == "alstm":
             self.model = ALSTM(**model_params)
+        elif model_type == "gbdt":
+            self.model = LGBModel(**model_params)
         else:
             raise ValueError(f"model_type={model_type} not supported")
 
@@ -146,7 +167,7 @@ config_lstm = {
     'test': ('2023-01-01', '2025-01-23'),
     'model_type': 'lstm',
     'model_params': {
-        'd_feat': 309,
+        'd_feat': 306,
         'hidden_size': 64,
         'num_layers': 2,
         'dropout': 0,
@@ -164,13 +185,13 @@ config_alstm = {
     'provider_uri': "/root/autodl-tmp/GoldSparrow/Day_data/qlib_data",
     'output_dir': "/root/autodl-tmp/GoldSparrow/Temp_Data",
     'pool': 'csi300',
-    'train': ('2008-01-01', '2016-12-31'),
-    'valid': ('2017-01-01', '2019-12-31'),
-    'test': ('2020-01-01', '2025-01-23'),
+    'train': ('2008-01-01', '2020-12-31'),
+    'valid': ('2021-01-01', '2022-12-31'),
+    'test': ('2023-01-01', '2025-01-23'),
     'model_type': 'alstm',
     'model_step_len': 20,
     'model_params': {
-        'd_feat': 309,
+        'd_feat': 306,
         'hidden_size': 64,
         'num_layers': 2,
         'dropout': 0,
@@ -186,11 +207,38 @@ config_alstm = {
     }
 }
 
+config_gbdt = {
+    'provider_uri': "/root/autodl-tmp/GoldSparrow/Day_data/qlib_data",
+    'output_dir': "/root/autodl-tmp/GoldSparrow/Temp_Data",
+    'pool': 'csi300',
+    'train': ('2008-01-01', '2020-12-31'),
+    'valid': ('2021-01-01', '2022-12-31'),
+    'test': ('2023-01-01', '2025-01-23'),
+    'model_type': 'gbdt',
+    'model_params': {
+        "loss": "mse",
+        "colsample_bytree": 0.8879,
+        "learning_rate": 0.001, #0.0421,
+        "subsample": 0.8789,
+        "lambda_l1": 205.6999,
+        "lambda_l2": 580.9768,
+        "max_depth": 8,
+        "num_leaves": 210,
+        "num_threads": 20,
+        "early_stopping_rounds": 400, # 训练迭代提前停止条件
+        "num_boost_round": 2000, # 最大训练迭代次数
+    }
+}
+
 # 使用示例
 # quant_model_lstm = QuantModel(config_lstm, config_lstm['output_dir'])
 # quant_model_lstm.train_evaluate()
 #quant_model_lstm.online_predict()
 
-quant_model_alstm = QuantModel(config_alstm, config_alstm['output_dir'])
-quant_model_alstm.train_evaluate()
-#quant_model_alstm.online_predict()
+# quant_model_alstm = QuantModel(config_alstm, config_alstm['output_dir'])
+# quant_model_alstm.train_evaluate()
+# #quant_model_alstm.online_predict()
+
+##使用GBDT model输出特征的重要性
+quant_model_gbdt = QuantModel(config_gbdt, config_gbdt['output_dir'])
+quant_model_gbdt.get_feature_importance()

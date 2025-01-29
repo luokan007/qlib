@@ -240,9 +240,9 @@ class MyAlpha158Ext(DataHandlerLP):
             '$TURN_ROC_40', '$TURN_ROC_5', '$TURN_RSI_10', '$TURN_RSI_20', '$TURN_RSI_40', '$TURN_RSI_5',
             '$TURN_SLOPE_10', '$TURN_SLOPE_20', '$TURN_SLOPE_40', '$TURN_SLOPE_5', '$TURN_TSF_10',
             '$TURN_TSF_20', '$TURN_TSF_40', '$TURN_TSF_5', '$ULTOSC', '$VAR_10', '$VAR_20', '$VAR_40',
-            '$VAR_5', '$WILLR_12', '$WILLR_24', '$WILLR_48', '$WILLR_6', '$base_RSRS', '$norm_RSRS',
-            '$pos_RSRS', '$revise_RSRS'
+            '$VAR_5', '$WILLR_12', '$WILLR_24', '$WILLR_48', '$WILLR_6',  '$base_RSRS','$norm_RSRS','$pos_RSRS','$revise_RSRS'
         ]
+
         names += [
             'AD', 'ADOSC', 'ADX_14', 'ADX_28', 'AMOUNT_LN', 'AMT_EMA_10', 'AMT_EMA_20', 'AMT_EMA_40',
             'AMT_EMA_5', 'AMT_MAX_10', 'AMT_MAX_20', 'AMT_MAX_40', 'AMT_MAX_5', 'AMT_MIN_10', 'AMT_MIN_20',
@@ -264,7 +264,7 @@ class MyAlpha158Ext(DataHandlerLP):
             'TURN_RSI_10', 'TURN_RSI_20', 'TURN_RSI_40', 'TURN_RSI_5', 'TURN_SLOPE_10', 'TURN_SLOPE_20',
             'TURN_SLOPE_40', 'TURN_SLOPE_5', 'TURN_TSF_10', 'TURN_TSF_20', 'TURN_TSF_40', 'TURN_TSF_5',
             'ULTOSC', 'VAR_10', 'VAR_20', 'VAR_40', 'VAR_5', 'WILLR_12', 'WILLR_24', 'WILLR_48',
-            'WILLR_6', 'base_RSRS', 'norm_RSRS', 'pos_RSRS', 'revise_RSRS'
+            'WILLR_6', 'base_RSRS','norm_RSRS','pos_RSRS','revise_RSRS'
         ]
         
         # ## v4.1, totally 305 features: 143(ta-lib) + 158(初始的) + 4（（turn / peTTM / pbMRQ / psTTM））
