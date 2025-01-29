@@ -4,6 +4,7 @@ from pathlib import Path
 from datetime import datetime
 import qlib
 from qlib.data.dataset import DatasetH
+from qlib.data.dataset import TSDatasetH
 from qlib.data.dataset.handler import DataHandlerLP
 from qlib.data.dataset.processor import CSZScoreNorm, DropnaProcessor, RobustZScoreNorm, Fillna,DropnaLabel,CSRankNorm
 from qlib.contrib.model.pytorch_lstm import LSTM
@@ -35,6 +36,7 @@ class QuantModel:
         pkl_path = os.path.join(self.work_dir, f"predictions_{timestamp}.pkl")
         csv_path = os.path.join(self.work_dir, f"predictions_{timestamp}.csv")
         config_path = os.path.join(self.work_dir, f"config_{timestamp}.json")
+        print(f"configure file : {config_path}")
         
         self.config['model_path'] = model_path
         self.config['prediction_pkl'] = pkl_path
@@ -43,15 +45,22 @@ class QuantModel:
         self.model.to_pickle(model_path)
         pred.to_pickle(pkl_path)
         pred.to_csv(csv_path)
-         # 提取label文件，计算ic/icir/long precision/short precision
-        params = dict(segments="test", col_set="label", data_key=DataHandlerLP.DK_R)
-        label = self.dataset.prepare(**params)
-        #print(label)
-
-        eval = MyEval.from_dataframe(pred, label)
-        eval_result = eval.eval()
+        
+        model_type = self.config['model_type']
+        
+        if model_type == "lstm":
+            # 提取label文件，计算ic/icir/long precision/short precision
+            params = dict(segments="test", col_set="label", data_key=DataHandlerLP.DK_R)
+            label = self.dataset.prepare(**params)
+            #print(label)
+            eval = MyEval.from_dataframe(pred, label)
+            eval_result = eval.eval()
+        elif model_type == "alstm":
+            ## alstm暂时不支持计算
+            eval_result = {}
+        else:
+            raise ValueError(f"model_type={model_type} not supported")
         #print(eval_result)
-
 
         # 将评估结果添加到配置中
         self.config['evaluation'] = eval_result
@@ -99,11 +108,23 @@ class QuantModel:
             fit_end_time=fit_end_time,     
             filter_pipe=filter_rule,
        )
-        self.dataset = DatasetH(handler, segments={
-            'train': self.config['train'],
-            'valid': self.config['valid'],
-            'test': self.config['test']
-        })
+        model_type = self.config['model_type']
+        train = self.config['train']
+        valid = self.config['valid']
+        test = self.config['test']
+        
+        if model_type.lower() == "lstm":
+            self.dataset = DatasetH(handler = handler, segments={"train": train,"valid": valid, "test":test})
+        # elif model_type.lower() == "lgbmodel":
+        #     self.dataset = DatasetH(handler = handler, segments={"train": train,"valid": valid, "test":test})
+        # elif model_type.lower() == "linear":
+        #     self.dataset = DatasetH(handler = handler, segments={"train": train,"test":test})
+        elif model_type.lower() == "alstm":
+            step_len = self.config['model_step_len']
+            self.dataset = TSDatasetH(step_len = step_len, handler = handler, segments={"train": train,"valid": valid, "test":test})
+        else:
+            raise ValueError(f"model_type={model_type} not supported")
+
 
     def _initialize_model(self):
         model_type = self.config['model_type']
@@ -122,14 +143,14 @@ config_lstm = {
     'pool': 'csi300',
     'train': ('2008-01-01', '2020-12-31'),
     'valid': ('2020-01-01', '2022-12-31'),
-    'test': ('2023-01-01', '2025-01-13'),
+    'test': ('2023-01-01', '2025-01-23'),
     'model_type': 'lstm',
     'model_params': {
-        'd_feat': 305,
+        'd_feat': 309,
         'hidden_size': 64,
         'num_layers': 2,
         'dropout': 0,
-        'n_epochs': 50,
+        'n_epochs': 30,
         'lr': 0.00001,
         'early_stop': 20,
         'batch_size': 800,
@@ -145,14 +166,15 @@ config_alstm = {
     'pool': 'csi300',
     'train': ('2008-01-01', '2016-12-31'),
     'valid': ('2017-01-01', '2019-12-31'),
-    'test': ('2020-01-01', '2025-01-10'),
+    'test': ('2020-01-01', '2025-01-23'),
     'model_type': 'alstm',
+    'model_step_len': 20,
     'model_params': {
-        'd_feat': 305,
+        'd_feat': 309,
         'hidden_size': 64,
         'num_layers': 2,
         'dropout': 0,
-        'n_epochs': 50,
+        'n_epochs': 30,
         'lr': 0.00001,
         'early_stop': 20,
         'batch_size': 800,
@@ -165,10 +187,10 @@ config_alstm = {
 }
 
 # 使用示例
-quant_model_lstm = QuantModel(config_lstm, config_lstm['output_dir'])
-quant_model_lstm.train_evaluate()
+# quant_model_lstm = QuantModel(config_lstm, config_lstm['output_dir'])
+# quant_model_lstm.train_evaluate()
 #quant_model_lstm.online_predict()
 
-#quant_model_alstm = QuantModel(config_alstm, config_alstm['output_dir'])
-#quant_model_alstm.train_evaluate()
+quant_model_alstm = QuantModel(config_alstm, config_alstm['output_dir'])
+quant_model_alstm.train_evaluate()
 #quant_model_alstm.online_predict()

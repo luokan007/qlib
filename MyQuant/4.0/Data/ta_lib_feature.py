@@ -9,6 +9,8 @@ import pandas as pd
 import talib
 from joblib import Parallel, delayed
 from tqdm import tqdm  
+from rsrs_feature import RSRSFeature
+
 
 
 class TALibFeature:
@@ -84,7 +86,7 @@ class TALibFeature:
             
         }
 
-        self.minimum_data_length = 200 # 最小数据长度,去除交易时间过短的数据，200约为一年的时长
+        self.minimum_data_length = 700 # 最小数据长度,去除交易时间过短的数据，700为三年的时长
 
         self.median_df = pd.DataFrame()
         self.amount_df = pd.DataFrame()
@@ -650,6 +652,41 @@ class TALibFeature:
         for period in self.feature_functions['AMT_VAR']['timeperiod']:
             features[f'AMT_VAR_{period}'] = talib.VAR(df[amount_ln_col], timeperiod=period)
         return pd.DataFrame(features, index=df.index)
+    
+    def generate_rsrs_features(self, df):
+        """
+        新增RSRS特征
+        Args:
+            df (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """
+        features = {}
+        # 确保数据列名符合预期
+        assert 'high' in df.columns
+        assert 'low' in df.columns
+        df = df[['high', 'low']].copy()
+
+        ## RSRS
+        return RSRSFeature.calculate_rsrs_features(df=df, time_range=20,window_size=500) ##2年的数据作为时间窗口
+        
+        
+
+    def _process_stock_data(self, file_name, df, output_dir):
+        code = file_name.split('.')[0]
+        # 生成新特征
+        new_features = self.generate_single_stock_features(df)
+        slice_features = self.generate_slice_features(code)
+        rsrs_features = self.generate_rsrs_features(df)
+        # 合并特征
+        #result = pd.concat([df, new_features, slice_features], axis=1)
+        result = pd.concat([df, new_features, slice_features,rsrs_features], axis=1)
+        output_path = Path(output_dir) / file_name
+        result.to_csv(output_path)
+        #columns = new_features.columns.tolist() + slice_features.columns.tolist()
+        columns = new_features.columns.tolist() + slice_features.columns.tolist() + rsrs_features.columns.tolist()
+        return columns
 
     def process_directory(self, input_dir, output_dir):
         """处理整个目录的CSV文件"""
@@ -669,8 +706,12 @@ class TALibFeature:
 
             if any(code in filename for code in self.stock_codes_set): # 如果是股票
                 try:
-                     # 读取CSV文件
+                     # 读取CSV文件,索引列为第一列，
                     df = pd.read_csv(file_path, index_col=0, parse_dates=True)
+### 读取的数据格式如下：
+# date,open,high,low,close,preclose,volume,amount,turn,tradestatus,pctChg,isST,peTTM,pbMRQ,psTTM,pcfNcfTTM,foreAdjustFactor,backAdjustFactor,adjustFactor,factor,vwap,epsTTM,totalShare,liqaShare
+# 2008-01-02,44.80247325,45.67666785,43.78257955,45.4581192,44.36537595,9930800.0,61302049.0,2.203873,1.0,2.463048,0.0,1791.807669,4.420813,1.68484,-18.929168,1.0,1.0,1.0,1.0,6.172921516896927,0.003483,623700000.00,450606738.00
+# 2008-01-03,45.38526965,46.9151102,44.94817235,46.4780129,45.4581192,15608075.0,98710863.0,3.463791,1.0,2.243595,0.0,1832.008482,4.519998,1.722641,-19.353861,1.0,1.0,1.0,1.0,6.3243457633308395,0.003483,623700000.00,450606738.00
                     if df.empty: # 去除空数据
                         print(f"Empty file: {file_path.name}")
                         empty_count += 1
@@ -704,30 +745,38 @@ class TALibFeature:
 
         ##计算横截面特征，需要先计算全局数据
         self.pre_process_slice_features(stock_data)
-        # 处理每个CSV文件
         feature_names = set()
-        for file_name, df in tqdm(stock_data.items(), desc="Process stock data...", unit="file"):
-            code = file_name.split('.')[0]
-            try:
-            # 生成新特征
-                new_features = self.generate_single_stock_features(df)
-                slice_features = self.generate_slice_features(code)
+        # 处理每个CSV文件
+        # 
+        # for file_name, df in tqdm(stock_data.items(), desc="Process stock data...", unit="file"):
+        #     try:
+        #         cols_new = self._process_stock_data(file_name, df, output_dir)
+        #         feature_names.update(cols_new)
+        #     except Exception as e:
+        #         print(f"Error processing {file_name}: {str(e)}")
+                
+        # 使用joblib进行并行计算
+        results = Parallel(n_jobs=-1)(
+            delayed(self._process_stock_data)(file_name, df, output_dir)
+            for file_name, df in tqdm(stock_data.items(), desc="Process stock data...", unit="file")
+        )
 
-                # 合并特征
-                result = pd.concat([df, new_features], axis=1)
-                result = pd.concat([result, slice_features], axis=1)
+        # 更新特征名称
+        for cols_new in results:
+            feature_names.update(cols_new)
+        
+        # with ProcessPoolExecutor() as executor:
+        #     futures = {}
+        #     for file_name, df in stock_data.items():
+        #         futures[executor.submit(self._process_stock_data, file_name, df, output_dir)] = file_name
 
-                # 保存结果
-                output_path = Path(output_dir) / file_name
-                result.to_csv(output_path)
-                #print(f"Successfully processed {file_name}")
-
-                # 收集特征名称
-                feature_names.update(new_features.columns)
-                feature_names.update(slice_features.columns)
-
-            except Exception as e:
-                print(f"Error processing {file_name}: {str(e)}")
+        #     for future in tqdm(as_completed(futures), desc="Process stock data...", unit="file"):
+        #         file_name = futures[future]
+        #         try:
+        #             cols_new = future.result()
+        #             feature_names.update(cols_new)
+        #         except Exception as e:
+        #             print(f"Error processing {file_name}: {str(e)}")
 
         # 输出特征名称到文件
         with open(Path(output_dir) / 'feature_names.txt', 'w') as f:

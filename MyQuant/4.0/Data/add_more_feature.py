@@ -36,7 +36,7 @@ def _dump_qlib_data(csv_path, qlib_data_path, max_workers=8):
 
 def _fix_constituents(qlib_data_path):
     
-    today = '2025-01-10' #str(datetime.date.today())
+    today = '2025-01-26' #str(datetime.date.today())
     path = f"{qlib_data_path}/instruments"
 
     for p in Path(path).iterdir():
