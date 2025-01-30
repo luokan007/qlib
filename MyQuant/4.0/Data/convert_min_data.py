@@ -57,14 +57,7 @@ def process_file(args):
     output_file = output_path / f"{full_code}.csv"
     df.to_csv(output_file, index=False)
 
-def convert_json_to_csv(input_dir, output_dir, basic_info_path):
-    info_df = pd.read_csv(basic_info_path)  # code,code_name,ipoDate,outDate,type,status
-    # 构建映射: "000002" -> "sh000002"
-    code_map = {}
-    for row in info_df.itertuples():
-        ex, partial = row.code.split('.')
-        code_map[partial] = ex + partial
-
+def convert_json_to_csv(input_dir, output_dir, code_map):
     input_path = Path(input_dir)
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
@@ -82,8 +75,15 @@ if __name__ == '__main__':
 # sh.000002,上证A股指数,1992-02-21,,2,1
 # sh.000003,上证B股指数,1992-08-17,,2,1
 
+    info_df = pd.read_csv(basic_info_path)  # code,code_name,ipoDate,outDate,type,status
+    # 构建映射: "000002" -> "sh000002"
+    code_map = {}
+    for row in info_df.itertuples():
+        ex, partial = row.code.split('.')
+        code_map[partial] = ex + partial
+
 
     input_dir = "/root/autodl-tmp/GoldSparrow/Min_data/jvquant/2024"
     output_dir = "/root/autodl-tmp/GoldSparrow/Min_data/Raw/2024"
     
-    convert_json_to_csv(input_dir, output_dir, basic_info_path)
+    convert_json_to_csv(input_dir, output_dir, code_map)

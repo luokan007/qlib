@@ -108,8 +108,8 @@ class QuantModel:
             learn_processors=learn_processors,
             fit_start_time=fit_start_time,
             fit_end_time=fit_end_time,     
-            filter_pipe=filter_rule,
-       )
+            filter_pipe=filter_rule)
+        
         model_type = self.config['model_type']
         train = self.config['train']
         valid = self.config['valid']
@@ -124,7 +124,7 @@ class QuantModel:
         elif model_type.lower() == "alstm":
             step_len = self.config['model_step_len']
             self.dataset = TSDatasetH(step_len = step_len, handler = handler, segments={"train": train,"valid": valid, "test":test})
-        if model_type.lower() == "gbdt":
+        elif model_type.lower() == "gbdt":
             self.dataset = DatasetH(handler = handler, segments={"train": train,"valid": valid, "test":test})
         else:
             raise ValueError(f"model_type={model_type} not supported")
