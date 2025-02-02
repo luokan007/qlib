@@ -801,6 +801,10 @@ class MyAlpha158_DyFeature(DataHandlerLP):
         feature_meta_file = None,
         **kwargs
     ):
+        if feature_meta_file is None:
+            raise ValueError("feature meta file should be provided")
+        self.dynamic_feature_dic = self._load_feature_meta(feature_meta_file)
+        
         infer_processors = check_transform_proc(infer_processors, fit_start_time, fit_end_time)
         learn_processors = check_transform_proc(learn_processors, fit_start_time, fit_end_time)
 
@@ -815,13 +819,7 @@ class MyAlpha158_DyFeature(DataHandlerLP):
                 "freq": freq,
                 "inst_processors": inst_processors,
             },
-        }
-        
-        
-        if feature_meta_file is None:
-            raise ValueError("feature meta file should be provided")
-        self.dynamic_feature_dic = self._load_feature_meta(feature_meta_file)
-             
+        }     
         super().__init__(
             instruments=instruments,
             start_time=start_time,

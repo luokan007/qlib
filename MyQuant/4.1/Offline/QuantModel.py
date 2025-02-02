@@ -20,7 +20,6 @@ class QuantModel:
         self.dataset = None
         self.selected_features_list = None 
         self.selected_feature_num = None
-        qlib.init(provider_uri=config['provider_uri'], region="cn")
         Path(work_dir).mkdir(parents=True, exist_ok=True)
         
         if selected_features is not None:
@@ -229,9 +228,9 @@ config_alstm = {
         'hidden_size': 64,
         'num_layers': 2,
         'dropout': 0,
-        'n_epochs': 30,
+        'n_epochs': 20,
         'lr': 0.00001,
-        'early_stop': 20,
+        'early_stop': 10,
         'batch_size': 800,
         'metric': "loss",
         'loss': "mse",
@@ -265,12 +264,14 @@ config_gbdt = {
     }
 }
 
+## init qlib for only one time, otherwise will raise error
+qlib.init(provider_uri=config_gbdt['provider_uri'], region="cn")
 
 ##使用GBDT model输出特征的重要性, 筛选特征
 quant_model_gbdt = QuantModel(config_gbdt, config_gbdt['output_dir'])
 feature_importance_list = quant_model_gbdt.get_feature_importance()
 print("feature importance list:")
-print(feature_importance_list[:10])
+print(feature_importance_list)
 
 ##删除quant_model_gbdt，释放内存
 del quant_model_gbdt
