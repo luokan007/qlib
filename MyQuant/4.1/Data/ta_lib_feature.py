@@ -9,6 +9,9 @@ import pandas as pd
 import talib
 from joblib import Parallel, delayed
 from tqdm import tqdm  
+from rsrs_feature import RSRSFeature
+
+
 
 class TALibFeature:
     """_summary_
@@ -648,7 +651,26 @@ class TALibFeature:
         ## AMT_VAR
         for period in self.feature_functions['AMT_VAR']['timeperiod']:
             features[f'AMT_VAR_{period}'] = talib.VAR(df[amount_ln_col], timeperiod=period)
-        return pd.DataFrame(features, index=df.index) 
+        return pd.DataFrame(features, index=df.index)
+    
+    def generate_rsrs_features(self, df):
+        """
+        新增RSRS特征
+        Args:
+            df (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """
+        features = {}
+        # 确保数据列名符合预期
+        assert 'high' in df.columns
+        assert 'low' in df.columns
+        df = df[['high', 'low']].copy()
+
+        ## RSRS
+        return RSRSFeature.calculate_rsrs_features(df=df, time_range=20,window_size=500) ##2年的数据作为时间窗口
+        
         
 
     def _process_stock_data(self, file_name, df, output_dir):
@@ -656,14 +678,14 @@ class TALibFeature:
         # 生成新特征
         new_features = self.generate_single_stock_features(df)
         slice_features = self.generate_slice_features(code)
-        #rsrs_features = self.generate_rsrs_features(df)
+        rsrs_features = self.generate_rsrs_features(df)
         # 合并特征
-        result = pd.concat([df, new_features, slice_features], axis=1)
-        #result = pd.concat([df, new_features, slice_features,rsrs_features], axis=1)
+        #result = pd.concat([df, new_features, slice_features], axis=1)
+        result = pd.concat([df, new_features, slice_features,rsrs_features], axis=1)
         output_path = Path(output_dir) / file_name
         result.to_csv(output_path)
-        columns = new_features.columns.tolist() + slice_features.columns.tolist()
-        #columns = new_features.columns.tolist() + slice_features.columns.tolist() + rsrs_features.columns.tolist()
+        #columns = new_features.columns.tolist() + slice_features.columns.tolist()
+        columns = new_features.columns.tolist() + slice_features.columns.tolist() + rsrs_features.columns.tolist()
         return columns
 
     def process_directory(self, input_dir, output_dir):
