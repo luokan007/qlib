@@ -779,7 +779,7 @@ class MyAlpha158Ext(DataHandlerLP):
     def get_label_config(self):
         return ["Ref($open, -2)/Ref($open, -1) - 1"], ["LABEL0"]
     
-class MyAlpha158_DyFeat(DataHandlerLP):
+class MyAlpha158_DyFeature(DataHandlerLP):
     """通过动态传入feature meta文件，实现动态feature的DataHandlerLP
 
     Args:
@@ -817,6 +817,9 @@ class MyAlpha158_DyFeat(DataHandlerLP):
             },
         }
         
+        
+        if feature_meta_file is None:
+            raise ValueError("feature meta file should be provided")
         self.dynamic_feature_dic = self._load_feature_meta(feature_meta_file)
              
         super().__init__(

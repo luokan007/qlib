@@ -10,8 +10,7 @@ from qlib.data.dataset.processor import CSZScoreNorm, DropnaProcessor, RobustZSc
 from qlib.contrib.model.pytorch_lstm import LSTM
 from qlib.contrib.model.pytorch_alstm_ts import ALSTM
 from qlib.contrib.model.gbdt import LGBModel
-from qlib.contrib.data.handler import MyAlpha158Ext
-from qlib.contrib.data.handler import Alpha158
+from qlib.contrib.data.handler import MyAlpha158_DyFeature
 from eval_model import MyEval
 class QuantModel:
     def __init__(self, config, work_dir, selected_features=None):
@@ -20,13 +19,13 @@ class QuantModel:
         self.model = None
         self.dataset = None
         self.selected_features_list = None 
-        self.selected_feature_num = 200
+        self.selected_feature_num = None
         qlib.init(provider_uri=config['provider_uri'], region="cn")
         Path(work_dir).mkdir(parents=True, exist_ok=True)
         
         if selected_features is not None:
-            self.selected_features_list = selected_features[:self.selected_feature_num]
-            self.config["model_params"]["d_feat"] = self.selected_feature_num
+            self.selected_features_list = selected_features
+            self.selected_feature_num = len(selected_features)
 
     def train_evaluate(self):
         self._prepare_data()
@@ -94,6 +93,7 @@ class QuantModel:
         end_time = self.config['test'][1]
         fit_start_time = self.config['train'][0]
         fit_end_time = self.config['train'][1]
+        feature_meta_file = self.config['feature_meta_file']
         
         # 推理处理器，RobustZScoreNorm要算fit_start_time和fit_end_time间的因子均值和方差，
         # 然后因子要减去均值除以标准差就行正则化
@@ -117,7 +117,7 @@ class QuantModel:
         #                                       clip_outlier=True),DropnaProcessor(fields_group='feature')]
         learn_processors = [DropnaLabel(),CSRankNorm(fields_group='label')]
         filter_rule = None # ExpressionDFilter(rule_expression='EMA($close, 10)<10')
-        handler =MyAlpha158Ext(instruments=pool,
+        handler =MyAlpha158_DyFeature(instruments=pool,
             start_time=start_time,
             end_time=end_time,
             freq="day",
@@ -125,12 +125,30 @@ class QuantModel:
             learn_processors=learn_processors,
             fit_start_time=fit_start_time,
             fit_end_time=fit_end_time,     
-            filter_pipe=filter_rule)
-        
+            filter_pipe=filter_rule,
+            feature_meta_file=feature_meta_file)
+
         model_type = self.config['model_type']
         train = self.config['train']
         valid = self.config['valid']
         test = self.config['test']
+        
+        if self.selected_feature_num is not None:
+            if model_type.lower() == "lstm" or model_type.lower() == "alstm":
+                self.config["model_params"]["d_feat"] = self.selected_feature_num
+            elif model_type.lower() == "gbdt":
+                pass # do nothing
+            else:
+                raise ValueError(f"model_type={model_type} not supported")
+        else:
+            if model_type.lower() == "lstm" or model_type.lower() == "alstm":
+                self.config["model_params"]["d_feat"] = handler.get_feature_count()
+            elif model_type.lower() == "gbdt":
+                pass
+            else:
+                raise ValueError(f"model_type={model_type} not supported")
+        
+        
         
         if model_type.lower() == "lstm":
             self.dataset = DatasetH(handler = handler, segments={"train": train,"valid": valid, "test":test})
@@ -175,6 +193,7 @@ class QuantModel:
 config_lstm = {
     'provider_uri': "/root/autodl-tmp/GoldSparrow/Day_data/qlib_data",
     'output_dir': "/root/autodl-tmp/GoldSparrow/Temp_Data",
+    'feature_meta_file': '/root/autodl-tmp/GoldSparrow/Day_data/qlib_data/feature_meta.json',
     'pool': 'csi300',
     'train': ('2008-01-01', '2020-12-31'),
     'valid': ('2020-01-01', '2022-12-31'),
@@ -198,6 +217,7 @@ config_lstm = {
 config_alstm = {
     'provider_uri': "/root/autodl-tmp/GoldSparrow/Day_data/qlib_data",
     'output_dir': "/root/autodl-tmp/GoldSparrow/Temp_Data",
+    'feature_meta_file': '/root/autodl-tmp/GoldSparrow/Day_data/qlib_data/feature_meta.json',
     'pool': 'csi300',
     'train': ('2008-01-01', '2020-12-31'),
     'valid': ('2021-01-01', '2022-12-31'),
@@ -224,6 +244,7 @@ config_alstm = {
 config_gbdt = {
     'provider_uri': "/root/autodl-tmp/GoldSparrow/Day_data/qlib_data",
     'output_dir': "/root/autodl-tmp/GoldSparrow/Temp_Data",
+    'feature_meta_file': '/root/autodl-tmp/GoldSparrow/Day_data/qlib_data/feature_meta.json',
     'pool': 'csi300',
     'train': ('2008-01-01', '2020-12-31'),
     'valid': ('2021-01-01', '2022-12-31'),
@@ -248,12 +269,23 @@ config_gbdt = {
 ##使用GBDT model输出特征的重要性, 筛选特征
 quant_model_gbdt = QuantModel(config_gbdt, config_gbdt['output_dir'])
 feature_importance_list = quant_model_gbdt.get_feature_importance()
+print("feature importance list:")
+print(feature_importance_list[:10])
+
+##删除quant_model_gbdt，释放内存
+del quant_model_gbdt
+
+SELECTED_FEATURE_COUNT = 200
+selected_features = feature_importance_list[:SELECTED_FEATURE_COUNT]
+
+quant_model_alstm = QuantModel(config_alstm, config_alstm['output_dir'], selected_features)
+quant_model_alstm.train_evaluate()
+# #quant_model_alstm.online_predict()
+
+
+
 
 # 使用示例
 # quant_model_lstm = QuantModel(config_lstm, config_lstm['output_dir'])
 # quant_model_lstm.train_evaluate()
 #quant_model_lstm.online_predict()
-
-quant_model_alstm = QuantModel(config_alstm, config_alstm['output_dir'])
-quant_model_alstm.train_evaluate()
-# #quant_model_alstm.online_predict()

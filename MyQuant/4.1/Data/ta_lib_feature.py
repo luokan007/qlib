@@ -10,6 +10,7 @@ import talib
 from joblib import Parallel, delayed
 from tqdm import tqdm  
 from rsrs_feature import RSRSFeature
+import json
 
 
 
@@ -688,7 +689,7 @@ class TALibFeature:
         columns = new_features.columns.tolist() + slice_features.columns.tolist() + rsrs_features.columns.tolist()
         return columns
 
-    def process_directory(self, input_dir, output_dir):
+    def process_directory(self, input_dir, output_dir,feature_meta_file = None):
         """处理整个目录的CSV文件"""
         
         # 创建输出目录
@@ -728,7 +729,7 @@ class TALibFeature:
                 except Exception as e:
                     print(f"Error reading {file_path.name}: {str(e)}")
             else:
-                print(f"Reading non-stock file: {file_path.name}")
+                #print(f"Reading non-stock file: {file_path.name}")
                 df = pd.read_csv(file_path, parse_dates=['date'])
                 non_stock_data[file_path.name] = df
 
@@ -778,15 +779,24 @@ class TALibFeature:
         #         except Exception as e:
         #             print(f"Error processing {file_name}: {str(e)}")
 
+        # 生成feature dict
+        feature_meta_dic = {}
+        feature_meta_dic['fields'] = []
+        feature_meta_dic['names'] = []
+        feature_meta_dic['description'] = "version: v4.1, code time: 2025-02-01, scope: ta-lib/STR/RSRS, feature count: %d" % len(feature_names)
+        for feature_name in sorted(feature_names):
+            feature_meta_dic['fields'].append(f"${feature_name}")
+            feature_meta_dic['names'].append(feature_name)
+
         # 输出特征名称到文件
-        with open(Path(output_dir) / 'feature_names.txt', 'w') as f:
-            f.write("feature count: %d\n" % len(feature_names))
-            f.write('###names:\n')
-            for feature_name in sorted(feature_names):
-                f.write(f"'{feature_name}',\n")
-            f.write('###fields:\n')
-            for feature_name in sorted(feature_names):
-                f.write(f"'${feature_name}',\n")
+        if feature_meta_file is None:
+            meta_path = Path(output_dir) / 'feature_names.json'
+        else:
+            meta_path = feature_meta_file
+            
+        ##将dict 输出到json文件中
+        with open(meta_path, 'w') as f:
+            json.dump(feature_meta_dic, f, indent=4)
 
         for file_name, df in tqdm(non_stock_data.items(), desc="Process non-stock data...", unit="file"):
             # 仅保存沪深300的数据
