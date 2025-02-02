@@ -7,6 +7,7 @@ from ...data.dataset.processor import Processor
 from ...utils import get_callable_kwargs
 from ...data.dataset import processor as processor_module
 from inspect import getfullargspec
+import json
 
 
 def check_transform_proc(proc_l, fit_start_time, fit_end_time):
@@ -777,3 +778,122 @@ class MyAlpha158Ext(DataHandlerLP):
 
     def get_label_config(self):
         return ["Ref($open, -2)/Ref($open, -1) - 1"], ["LABEL0"]
+    
+class MyAlpha158_DyFeat(DataHandlerLP):
+    """通过动态传入feature meta文件，实现动态feature的DataHandlerLP
+
+    Args:
+        DataHandlerLP (_type_): _description_
+    """
+    def __init__(
+        self,
+        instruments="csi500",
+        start_time=None,
+        end_time=None,
+        freq="day",
+        infer_processors=[],
+        learn_processors=_DEFAULT_LEARN_PROCESSORS,
+        fit_start_time=None,
+        fit_end_time=None,
+        process_type=DataHandlerLP.PTYPE_A,
+        filter_pipe=None,
+        inst_processors=None,
+        feature_meta_file = None,
+        **kwargs
+    ):
+        infer_processors = check_transform_proc(infer_processors, fit_start_time, fit_end_time)
+        learn_processors = check_transform_proc(learn_processors, fit_start_time, fit_end_time)
+
+        data_loader = {
+            "class": "QlibDataLoader",
+            "kwargs": {
+                "config": {
+                    "feature": self.get_feature_config(),
+                    "label": kwargs.pop("label", self.get_label_config()),
+                },
+                "filter_pipe": filter_pipe,
+                "freq": freq,
+                "inst_processors": inst_processors,
+            },
+        }
+        
+        self.dynamic_feature_dic = self._load_feature_meta(feature_meta_file)
+             
+        super().__init__(
+            instruments=instruments,
+            start_time=start_time,
+            end_time=end_time,
+            data_loader=data_loader,
+            infer_processors=infer_processors,
+            learn_processors=learn_processors,
+            process_type=process_type,
+            **kwargs
+        )
+    
+    def get_feature_count(self):
+        return len(self.get_feature_config()[0])
+    
+    def _load_feature_meta(self, meta_file):
+        with open(meta_file, 'r') as f:
+            meta = json.load(f)
+        ##check json file content
+        if 'fields' not in meta or 'names' not in meta:
+            print(f"{meta_file} should contain 'fields' and 'names' keys")
+            print("meta file path: {meta_file}")
+            print("meta file content:\n {meta}")
+            raise ValueError("feature meta file should contain 'fields' and 'names' keys")
+        
+        ## check fields data type
+        if not isinstance(meta['fields'], list):
+            print(f"{meta_file} fields should be a list")
+            print("meta file path: {meta_file}")
+            print("meta file content:\n {meta}")
+            raise ValueError("feature meta file fields should be a list")
+        
+        ## check names data type
+        if not isinstance(meta['names'], list):
+            print(f"{meta_file} names should be a list")
+            print("meta file path: {meta_file}")
+            print("meta file content:\n {meta}")
+            raise ValueError("feature meta file names should be a list")
+        
+        ## check fields data format
+        if meta['fields'][0].startswith('$') == False:
+            print(f"{meta_file} fields format should start with '$'")
+            print("meta file path: {meta_file}")
+            print("meta file content:\n {meta}")
+            raise ValueError("feature meta file fields format should start with '$'")
+        
+        ## fields and names should have the same length
+        if meta['fields'] and meta['names'] and len(meta['fields']) != len(meta['names']):
+            print(f"{meta_file} fields and names should have the same length")
+            print("meta file path: {meta_file}")
+            print("meta file content:\n {meta}")
+            raise ValueError("feature meta file fields and names should have the same length")
+        
+        return meta
+    
+    def get_feature_config(self):
+        fields, names = [],[]
+        conf = {
+            "kbar": {},
+            "price": {
+                "windows": [0],
+                "feature": ["OPEN", "HIGH", "LOW", "VWAP"],
+            },
+            "rolling": {},
+        }
+        fields, names = Alpha158DL.get_feature_config(conf)
+        
+        fields += ['$turn','$peTTM', '$pbMRQ', '$psTTM']
+        fields += self.dynamic_feature_dic['fields']
+        
+        names += ['TURNOVER', 'PETTM', 'PBMQR', 'PSTTM']
+        names += self.dynamic_feature_dic['names']
+        
+        return fields, names
+
+    def get_label_config(self):
+        return ["Ref($open, -2)/Ref($open, -1) - 1"], ["LABEL0"]
+
+
