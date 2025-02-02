@@ -14,10 +14,10 @@ import json
 
 
 
-class TALibFeature:
+class TALibFeatureExt:
     """_summary_
     """
-    def __init__(self, basic_info_path,time_range = 30):
+    def __init__(self, basic_info_path,time_range = 30, stock_pool_path = None):
         """初始化特征生成器"""
         # 定义要生成的技术指标及其参数
         
@@ -105,6 +105,18 @@ class TALibFeature:
 
         self.stock_slice_df = pd.DataFrame()
         self._str_factor_df = pd.DataFrame()
+        
+        if stock_pool_path is not None:
+            with open(stock_pool_path, 'r') as f:
+                self.stock_pool = set()
+                for line in f:
+                    parts = line.strip().split()
+                    if parts:
+                        self.stock_pool.add(parts[0].lower())
+            
+            print(f"Using stock pool. Loaded {len(self.stock_pool)} stocks from {stock_pool_path}")
+        else:
+            self.stock_pool = None
         
 
 
@@ -702,8 +714,14 @@ class TALibFeature:
         effective_count = 0
         empty_count = 0
         short_count = 0
+        csv_files = Path(input_dir).glob('*.csv')
+        print(f"{input_dir} have {len(list(csv_files))} files")
         for file_path in Path(input_dir).glob('*.csv'):
             filename = file_path.name
+            stock_id = filename.rsplit('.', 1)[0]
+        
+            if self.stock_pool is not None and stock_id not in self.stock_pool:
+                continue
 
             if any(code in filename for code in self.stock_codes_set): # 如果是股票
                 try:
@@ -808,15 +826,17 @@ def __test__():
     # 测试特征生成器
     #basic_info_path = '/home/godlike/project/GoldSparrow/Day_Data/Day_data/qlib_data/basic_info.csv'
     basic_info_path = '/root/autodl-tmp/GoldSparrow/Day_data/qlib_data/basic_info.csv'
-    
-    feature_generator = TALibFeature(basic_info_path=basic_info_path,time_range = 5)
+
     #in_folder = '/home/godlike/project/GoldSparrow/Day_Data/Day_data/test_raw'
     #out_folder = '/home/godlike/project/GoldSparrow/Day_Data/Day_data/test_raw_ta'
     
     in_folder = '/root/autodl-tmp/GoldSparrow/Day_data/test_raw'
     out_folder = '/root/autodl-tmp/GoldSparrow/Day_data/test_raw_ta'
+    feature_meta_file = '/root/autodl-tmp/GoldSparrow/Day_data/feature_names.json'
+    stock_pool_file = '/root/autodl-tmp/GoldSparrow/Day_data/qlib_data/instruments/csi300.txt'
     
-    feature_generator.process_directory(in_folder, out_folder)
+    feature_generator = TALibFeature(basic_info_path=basic_info_path,time_range = 5,stock_pool_path=stock_pool_file)
+    feature_generator.process_directory(in_folder, out_folder,feature_meta_file)
 
 if __name__ == '__main__':
     __test__()

@@ -5,8 +5,9 @@ import shutil
 import os
 from pathlib import Path
 import pandas as pd
-from ta_lib_feature import TALibFeature
+from ta_lib_feature import TALibFeatureExt
 from mydump_bin import DumpDataAll
+import json
 
 
 def _dump_qlib_data(csv_path, qlib_data_path, max_workers=8):
@@ -48,7 +49,7 @@ def _fix_constituents(qlib_data_path):
         df[2] = df[2].replace(latest_data, today)
         df.to_csv(p, header=False, index=False, sep="\t")
 
-def add_features(data_dir, output_dir,basic_info_path):
+def add_features(data_dir, output_dir,basic_info_path,feature_meta_file,stock_pool):
     """
     Add technical analysis features to stock data using TALib
     
@@ -59,7 +60,7 @@ def add_features(data_dir, output_dir,basic_info_path):
     output_dir : str
         Directory to save the processed files with new features
     """
-    ta_feature_generator = TALibFeature(basic_info_path=basic_info_path,time_range=30)
+    ta_feature_generator = TALibFeatureExt(basic_info_path=basic_info_path,time_range=30,stock_pool_path=stock_pool)
 
     if os.path.exists(output_dir) and os.path.isdir(output_dir):
         # 使用 shutil.rmtree 高效地移除整个目录树
@@ -68,7 +69,7 @@ def add_features(data_dir, output_dir,basic_info_path):
 
     # # 重新创建目录
     Path(output_dir).mkdir(parents=True, exist_ok=True)
-    ta_feature_generator.process_directory(data_dir, output_dir)
+    ta_feature_generator.process_directory(data_dir, output_dir,feature_meta_file)
 
 if __name__ == "__main__":
     # Define input and output directories
@@ -82,9 +83,15 @@ if __name__ == "__main__":
     qlib_directory = "/root/autodl-tmp/GoldSparrow/Day_data/qlib_data"
     basic_info_path = '/root/autodl-tmp/GoldSparrow/Day_data/qlib_data/basic_info.csv'
 
+    ##生成feature meta文件，传入到MyAlpha158Ext
+    feature_meta_file_path = '/root/autodl-tmp/GoldSparrow/Day_data/qlib_data/feature_meta.json'
+    
+    ##仅对csi300股票池进行处理
+    stock_pool_file = '/root/autodl-tmp/GoldSparrow/Day_data/qlib_data/instruments/csi300.txt'
+    
     
     # Process the data
-    add_features(data_directory, merged_directory,basic_info_path)
+    add_features(data_directory, merged_directory,basic_info_path,feature_meta_file_path,stock_pool_file)
     
     ##dump qlib data
     _dump_qlib_data(merged_directory, qlib_directory)
