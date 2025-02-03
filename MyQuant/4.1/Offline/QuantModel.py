@@ -47,6 +47,7 @@ class QuantModel:
         self.config['prediction_pkl'] = pkl_path
         self.config['prediction_csv'] = csv_path
         
+        print("dumping model to ", model_path)
         self.model.to_pickle(model_path)
         pred.to_pickle(pkl_path)
         pred.to_csv(csv_path)
@@ -71,6 +72,7 @@ class QuantModel:
         # 将评估结果添加到配置中
         self.config['evaluation'] = eval_result
 
+        print("dumping config to ", config_path)
         with open(config_path, 'w') as f:
             json.dump(self.config, f)
         
@@ -270,17 +272,23 @@ qlib.init(provider_uri=config_gbdt['provider_uri'], region="cn")
 ##使用GBDT model输出特征的重要性, 筛选特征
 quant_model_gbdt = QuantModel(config_gbdt, config_gbdt['output_dir'])
 feature_importance_list = quant_model_gbdt.get_feature_importance()
-print("feature importance list:")
-print(feature_importance_list)
+feature_black_list = ['base_RSRS','revise_RSRS','pos_RSRS']
+feature_importance_list = [f for f in feature_importance_list if f not in feature_black_list]
+print(f"feature length: {len(feature_importance_list)}")
+#print(feature_importance_list)
 
 ##删除quant_model_gbdt，释放内存
 del quant_model_gbdt
 
 SELECTED_FEATURE_COUNT = 200
 selected_features = feature_importance_list[:SELECTED_FEATURE_COUNT]
+print(f"selected feature list: {selected_features}\n\n")
+print(f"drop feature list: {feature_importance_list[SELECTED_FEATURE_COUNT:]}\n\n")
+
 
 quant_model_alstm = QuantModel(config_alstm, config_alstm['output_dir'], selected_features)
 quant_model_alstm.train_evaluate()
+print("done at ", datetime.now())
 # #quant_model_alstm.online_predict()
 
 
