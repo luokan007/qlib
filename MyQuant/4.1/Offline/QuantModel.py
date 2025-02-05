@@ -95,7 +95,7 @@ class QuantModel:
         fit_start_time = self.config['train'][0]
         fit_end_time = self.config['train'][1]
         feature_meta_file = self.config['feature_meta_file']
-        
+
         # 推理处理器，RobustZScoreNorm要算fit_start_time和fit_end_time间的因子均值和方差，
         # 然后因子要减去均值除以标准差就行正则化
         if self.selected_features_list is None:
@@ -175,8 +175,7 @@ class QuantModel:
         # 特征名，重要性值的对照字典
         feature_importance = {fea_name[int(i.split('_')[1])]: v for i,v in _importance.items()}
         sorted_importance = sorted(feature_importance.items(), key=lambda x: x[1], reverse=True)
-        feature_importance_list = [name for name, imp in sorted_importance]
-        return feature_importance_list
+        return sorted_importance
 
     def _initialize_model(self):
         model_type = self.config['model_type']
@@ -216,9 +215,9 @@ config_lstm = {
 
 # 示例配置字典 - ALSTM
 config_alstm = {
-    'provider_uri': "/root/autodl-tmp/GoldSparrow/Day_data/qlib_data",
+    'provider_uri': "/root/autodl-tmp/GoldSparrow/Day_data/qlib_data_csi300",
     'output_dir': "/root/autodl-tmp/GoldSparrow/Temp_Data",
-    'feature_meta_file': '/root/autodl-tmp/GoldSparrow/Day_data/qlib_data/feature_meta.json',
+    'feature_meta_file': '/root/autodl-tmp/GoldSparrow/Day_data/qlib_data_all/feature_meta.json',
     'pool': 'csi300',
     'train': ('2008-01-01', '2020-12-31'),
     'valid': ('2021-01-01', '2022-12-31'),
@@ -243,9 +242,9 @@ config_alstm = {
 }
 
 config_gbdt = {
-    'provider_uri': "/root/autodl-tmp/GoldSparrow/Day_data/qlib_data",
+    'provider_uri': "/root/autodl-tmp/GoldSparrow/Day_data/qlib_data_csi300",
     'output_dir': "/root/autodl-tmp/GoldSparrow/Temp_Data",
-    'feature_meta_file': '/root/autodl-tmp/GoldSparrow/Day_data/qlib_data/feature_meta.json',
+    'feature_meta_file': '/root/autodl-tmp/GoldSparrow/Day_data/qlib_data_all/feature_meta.json',
     'pool': 'csi300',
     'train': ('2008-01-01', '2020-12-31'),
     'valid': ('2021-01-01', '2022-12-31'),
@@ -266,33 +265,38 @@ config_gbdt = {
     }
 }
 
-## init qlib for only one time, otherwise will raise error
-qlib.init(provider_uri=config_gbdt['provider_uri'], region="cn")
+if __name__ == "__main__":
+    print("start at ", datetime.now())
 
-##使用GBDT model输出特征的重要性, 筛选特征
-quant_model_gbdt = QuantModel(config_gbdt, config_gbdt['output_dir'])
-feature_importance_list = quant_model_gbdt.get_feature_importance()
-feature_black_list = ['base_RSRS','revise_RSRS','pos_RSRS']
-feature_importance_list = [f for f in feature_importance_list if f not in feature_black_list]
-print(f"feature length: {len(feature_importance_list)}")
-#print(feature_importance_list)
+    ## init qlib for only one time, otherwise will raise error
+    qlib.init(provider_uri=config_gbdt['provider_uri'], region="cn")
 
-##删除quant_model_gbdt，释放内存
-del quant_model_gbdt
+    ##使用GBDT model输出特征的重要性, 筛选特征
+    quant_model_gbdt = QuantModel(config_gbdt, config_gbdt['output_dir'])
+    feature_importance = quant_model_gbdt.get_feature_importance()
+    
+    ##output feature importance
+    feature_importance_file = os.path.join(config_gbdt['output_dir'], "feature_importance.csv") 
+    with open(feature_importance_file, "w") as f:
+        for name, imp in feature_importance:
+            f.write(f"{name},{imp}\n")
+    
+    feature_importance_list = [name for name, imp in feature_importance]
 
-SELECTED_FEATURE_COUNT = 200
-selected_features = feature_importance_list[:SELECTED_FEATURE_COUNT]
-print(f"selected feature list: {selected_features}\n\n")
-print(f"drop feature list: {feature_importance_list[SELECTED_FEATURE_COUNT:]}\n\n")
+    feature_black_list = ['base_RSRS','revise_RSRS','pos_RSRS','norm_RSRS']
+    feature_importance_list = [f for f in feature_importance_list if f not in feature_black_list]
+    print(f"feature length: {len(feature_importance_list)}")
+    #print(feature_importance_list)
 
+    SELECTED_FEATURE_COUNT = 300
+    selected_features = feature_importance_list[:SELECTED_FEATURE_COUNT]
+    print(f"selected feature list: {selected_features}\n\n")
+    print(f"drop feature list: {feature_importance_list[SELECTED_FEATURE_COUNT:]}\n\n")
 
-quant_model_alstm = QuantModel(config_alstm, config_alstm['output_dir'], selected_features)
-quant_model_alstm.train_evaluate()
-print("done at ", datetime.now())
-# #quant_model_alstm.online_predict()
-
-
-
+    quant_model_alstm = QuantModel(config_alstm, config_alstm['output_dir'], selected_features)
+    quant_model_alstm.train_evaluate()
+    print("done at ", datetime.now())
+    # #quant_model_alstm.online_predict()
 
 # 使用示例
 # quant_model_lstm = QuantModel(config_lstm, config_lstm['output_dir'])
