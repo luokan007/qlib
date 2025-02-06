@@ -720,11 +720,11 @@ class TALibFeatureExt:
             filename = file_path.name
             stock_id = filename.rsplit('.', 1)[0]
         
-            if self.stock_pool is not None and stock_id not in self.stock_pool:
-                continue
 
             if any(code in filename for code in self.stock_codes_set): # 如果是股票
                 try:
+                    if self.stock_pool is not None and stock_id not in self.stock_pool:
+                        continue
                      # 读取CSV文件,索引列为第一列，
                     df = pd.read_csv(file_path, index_col=0, parse_dates=True)
 ### 读取的数据格式如下：

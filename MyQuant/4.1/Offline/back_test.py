@@ -213,11 +213,14 @@ def main():
     #provider_uri = "/home/godlike/project/GoldSparrow/Day_Data/Day_data/qlib_data"
      # 配置文件路径
      
-    work_dir = '/root/autodl-tmp/GoldSparrow/Temp_Data'
-    provider_uri = "/root/autodl-tmp/GoldSparrow/Day_data/qlib_data"
+    # work_dir = '/root/autodl-tmp/GoldSparrow/Temp_Data'
+    # provider_uri = "/root/autodl-tmp/GoldSparrow/Day_data/qlib_data"
+    
+    work_dir = '/home/godlike/project/GoldSparrow/Temp_Data'
+    provider_uri = "/home/godlike/project/GoldSparrow/Day_Data/Day_data/qlib_data"
 
-    config_file_name = 'config_20250203022559.json'
-    report_file_name = 'report_20250203022559.html'
+    config_file_name = 'config_20250206194432.json'
+    report_file_name = 'report_20250206194432.html'
     
     config_file_path = os.path.join(work_dir, config_file_name)    
     report_file_path = os.path.join(work_dir, report_file_name)

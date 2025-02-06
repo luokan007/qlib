@@ -81,8 +81,9 @@ if __name__ == "__main__":
     qlib_directory=f"{work_folder}/qlib_data"
     basic_info_path=f"{work_folder}/qlib_data/basic_info.csv"
     feature_meta_file_path = f"{work_folder}/feature_names.json"
-    stock_pool_file = f"{work_folder}/qlib_data/instruments/csi300.txt"
-
+    #stock_pool_file = None  ##全量数据
+    stock_pool_file = f"{work_folder}/qlib_data/instruments/csi300.txt"  ## 局部数据
+ 
     ## 云主机端设置
     # data_directory = "/root/autodl-tmp/GoldSparrow/Day_data/Raw"
     # merged_directory = "/root/autodl-tmp/GoldSparrow/Day_data/Merged_talib"
