@@ -824,18 +824,22 @@ class TALibFeatureExt:
 
 def __test__():
     # 测试特征生成器
-    #basic_info_path = '/home/godlike/project/GoldSparrow/Day_Data/Day_data/qlib_data/basic_info.csv'
-    basic_info_path = '/root/autodl-tmp/GoldSparrow/Day_data/qlib_data/basic_info.csv'
+    
+    ## 云主机地址    
+    #basic_info_path = '/root/autodl-tmp/GoldSparrow/Day_data/qlib_data/basic_info.csv'
+    #in_folder = '/root/autodl-tmp/GoldSparrow/Day_data/test_raw'
+    #out_folder = '/root/autodl-tmp/GoldSparrow/Day_data/test_raw_ta'
+    # feature_meta_file = '/root/autodl-tmp/GoldSparrow/Day_data/feature_names.json'
+    # stock_pool_file = '/root/autodl-tmp/GoldSparrow/Day_data/qlib_data/instruments/csi300.txt'
 
-    #in_folder = '/home/godlike/project/GoldSparrow/Day_Data/Day_data/test_raw'
-    #out_folder = '/home/godlike/project/GoldSparrow/Day_Data/Day_data/test_raw_ta'
-    
-    in_folder = '/root/autodl-tmp/GoldSparrow/Day_data/test_raw'
-    out_folder = '/root/autodl-tmp/GoldSparrow/Day_data/test_raw_ta'
-    feature_meta_file = '/root/autodl-tmp/GoldSparrow/Day_data/feature_names.json'
-    stock_pool_file = '/root/autodl-tmp/GoldSparrow/Day_data/qlib_data/instruments/csi300.txt'
-    
-    feature_generator = TALibFeature(basic_info_path=basic_info_path,time_range = 5,stock_pool_path=stock_pool_file)
+    ##本地地址
+    basic_info_path = '/home/godlike/project/GoldSparrow/Day_Data/Day_data/qlib_data_all/basic_info.csv'
+    in_folder = '/home/godlike/project/GoldSparrow/Day_Data/Day_data/test_raw'
+    out_folder = '/home/godlike/project/GoldSparrow/Day_Data/Day_data/test_raw_ta'
+    feature_meta_file = '/home/godlike/project/GoldSparrow/Day_Data/Day_data/feature_names.json'
+    stock_pool_file = '/home/godlike/project/GoldSparrow/Day_Data/Day_data/qlib_data_all/instruments/csi300.txt'
+
+    feature_generator = TALibFeatureExt(basic_info_path=basic_info_path,time_range = 5,stock_pool_path=stock_pool_file)
     feature_generator.process_directory(in_folder, out_folder,feature_meta_file)
 
 if __name__ == '__main__':

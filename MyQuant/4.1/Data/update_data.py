@@ -22,21 +22,18 @@ from baostock.data.resultset import ResultData
 import akshare as ak
 
 # from qlib_dump_bin import DumpDataAll
-from ta_lib_feature import TALibFeature
+from ta_lib_feature import TALibFeatureExt
 from mydump_bin import DumpDataAll
 import warnings
 warnings.filterwarnings("ignore")
-
 
 def _read_all_text(path: str) -> str:
     with open(path, "r") as f:
         return f.read()
 
-
 def _write_all_text(path: str, text: str) -> None:
     with open(path, "w") as f:
         f.write(text)
-
 
 class EnhancedDataManager:
     _all_a_shares: List[str]
@@ -70,6 +67,8 @@ class EnhancedDataManager:
         feature_path: str = None,
         qlib_data_path: str = None,
         basic_info_path: str = None,
+        feature_meta_file: str = None,
+        stock_pool_file: str = None,
         adjustflag: str = "1",  # "3": 不复权；"1"：后复权； "2"：前复权。
         start_date: str = None,  # 下载数据开始日期，格式如"2015-01-01" ，None从上市日开始
         end_date: str = None,  # 下载数据的结束日期。None则到最近日
@@ -86,6 +85,9 @@ class EnhancedDataManager:
 
         self._qlib_data_path = os.path.expanduser(qlib_data_path)
         self._basic_info_path = os.path.expanduser(basic_info_path)
+        self._feature_meta_file = feature_meta_file
+        self._stock_pool_file = stock_pool_file
+        
         self._adjustflag = adjustflag
 
         self._start_date = start_date
@@ -595,7 +597,9 @@ class EnhancedDataManager:
         output_dir : str
             Directory to save the processed files with new features
         """
-        ta_feature_generator = TALibFeature(basic_info_path=basic_info_path,time_range=30)
+        ta_feature_generator = TALibFeatureExt(basic_info_path=basic_info_path,
+                                               time_range=30,
+                                                stock_pool_path = self._stock_pool_file)
 
         if os.path.exists(output_dir) and os.path.isdir(output_dir):
             # 使用 shutil.rmtree 高效地移除整个目录树
@@ -603,7 +607,7 @@ class EnhancedDataManager:
 
         # # 重新创建目录
         Path(output_dir).mkdir(parents=True, exist_ok=True)
-        ta_feature_generator.process_directory(data_dir, output_dir)
+        ta_feature_generator.process_directory(data_dir, output_dir,self._feature_meta_file)
     
     def fetch_and_save_data(
         self,
@@ -698,19 +702,35 @@ if __name__ == "__main__":
     today = str(datetime.date.today())
     print(f"today: {today}")
 
-    dm = EnhancedDataManager(
-        #csv_path=r"/home/godlike/project/GoldSparrow/Day_Data/Day_data/Raw",
-        #qlib_data_path=r"/home/godlike/project/GoldSparrow/Day_Data/Day_data/qlib_data",        
+    # _csv_path=r"/root/autodl-tmp/GoldSparrow/Day_data/Raw"
+    # _feature_path=r"/root/autodl-tmp/GoldSparrow/Day_data/Merged_talib"
+    # _qlib_data_path=r"/root/autodl-tmp/GoldSparrow/Day_data/qlib_data"
+    # _basic_info_path='/root/autodl-tmp/GoldSparrow/Day_data/qlib_data/basic_info.csv'
 
-        csv_path=r"/root/autodl-tmp/GoldSparrow/Day_data/Raw",
-        feature_path=r"/root/autodl-tmp/GoldSparrow/Day_data/Merged_talib",
-        qlib_data_path=r"/root/autodl-tmp/GoldSparrow/Day_data/qlib_data",
-        basic_info_path='/root/autodl-tmp/GoldSparrow/Day_data/qlib_data/basic_info.csv',
+    ##本地环境
+    work_folder = "/home/godlike/project/GoldSparrow/Day_Data/Day_data"
+
+    _csv_path= f"{work_folder}/Raw"
+    _feature_path=f"{work_folder}/Merged_talib"
+    _qlib_data_path=f"{work_folder}/qlib_data"
+    _basic_info_path=f"{work_folder}/qlib_data/basic_info.csv"
+    _feature_meta_file = f"{work_folder}/feature_names.json"
+    _stock_pool_file = '/home/godlike/project/GoldSparrow/Day_Data/Day_data/qlib_data_all/instruments/csi300.txt'
+
+
+    dm = EnhancedDataManager(   
+
+        csv_path=_csv_path,
+        feature_path=_feature_path,
+        qlib_data_path=_qlib_data_path,
+        basic_info_path=_basic_info_path,
+        feature_meta_file = _feature_meta_file,
+        stock_pool_file = _stock_pool_file,
         #  adjustflag：复权方式，字符串."3": 不复权；"1"：后复权；"2"：前复权。
         #  BaoStock提供的是涨跌幅复权算法复权因子，具体介绍见：BaoStock复权因子简介。
         adjustflag="1",
         overwrite=True,  # 是否覆盖已存在的股票行情csv文件
-        max_workers=32,
+        max_workers=8,  ##8 core cpu, 云主机为32核
     )
 
     useCache = True  # 使用缓存股票基本信息，和调整因子。入股股票代码中的代码在缓存基本信息中不存在，则不会下载其行情数据
