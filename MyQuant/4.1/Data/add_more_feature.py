@@ -72,24 +72,25 @@ def add_features(data_dir, output_dir,basic_info_path,feature_meta_file,stock_po
     ta_feature_generator.process_directory(data_dir, output_dir,feature_meta_file)
 
 if __name__ == "__main__":
-    # Define input and output directories
-    # data_directory = "/home/godlike/project/GoldSparrow/Day_Data/Day_data/Raw"
-    # merged_directory = "/home/godlike/project/GoldSparrow/Day_Data/Day_data/Merged_talib"
-    # qlib_directory = "/home/godlike/project/GoldSparrow/Day_Data/Day_data/qlib_data"
-    # basic_info_path = '/home/godlike/project/GoldSparrow/Day_Data/Day_data/qlib_data/basic_info.csv'
+    
+    work_folder = "/home/godlike/project/GoldSparrow/Day_Data/Day_data"
 
-    data_directory = "/root/autodl-tmp/GoldSparrow/Day_data/Raw"
-    merged_directory = "/root/autodl-tmp/GoldSparrow/Day_data/Merged_talib"
-    qlib_directory = "/root/autodl-tmp/GoldSparrow/Day_data/qlib_data"
-    basic_info_path = '/root/autodl-tmp/GoldSparrow/Day_data/qlib_data/basic_info.csv'
+    ## 本地设置
+    data_directory = f"{work_folder}/Raw"
+    merged_directory=f"{work_folder}/Merged_talib"
+    qlib_directory=f"{work_folder}/qlib_data"
+    basic_info_path=f"{work_folder}/qlib_data/basic_info.csv"
+    feature_meta_file_path = f"{work_folder}/feature_names.json"
+    stock_pool_file = f"{work_folder}/qlib_data/instruments/csi300.txt"
 
-    ##生成feature meta文件，传入到MyAlpha158Ext
-    feature_meta_file_path = '/root/autodl-tmp/GoldSparrow/Day_data/qlib_data/feature_meta.json'
-    
-    ##仅对csi300股票池进行处理
-    stock_pool_file = '/root/autodl-tmp/GoldSparrow/Day_data/qlib_data/instruments/csi300.txt'
-    
-    
+    ## 云主机端设置
+    # data_directory = "/root/autodl-tmp/GoldSparrow/Day_data/Raw"
+    # merged_directory = "/root/autodl-tmp/GoldSparrow/Day_data/Merged_talib"
+    # qlib_directory = "/root/autodl-tmp/GoldSparrow/Day_data/qlib_data"
+    # basic_info_path = '/root/autodl-tmp/GoldSparrow/Day_data/qlib_data/basic_info.csv'
+    # feature_meta_file_path = '/root/autodl-tmp/GoldSparrow/Day_data/qlib_data/feature_meta.json'
+    # stock_pool_file = '/root/autodl-tmp/GoldSparrow/Day_data/qlib_data/instruments/csi300.txt'
+
     # Process the data
     add_features(data_directory, merged_directory,basic_info_path,feature_meta_file_path,stock_pool_file)
     
