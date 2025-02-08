@@ -381,7 +381,15 @@ class TALibFeatureExt:
                 - ULTOSC,Ultimate Oscillator
                 - WILLR,Williams' %R
             - Volume Indicators(成交量指标)
-                - AD, Chaikin A/D Line
+                - AD, Chaikin A/D Line                   '$TURN_RATE_5',
+                   '$TURN_RATE_10',
+                   '$TURN_RATE_20',
+                   '$TURN_RATE_MIX',
+                   '$TURN_ROC_6',
+                   '$TURN_ROC_12',
+                   '$TURN_ROC_24',
+                   '$TURN_ROC_48',
+                   '$BETA',
                 - ADOSC, Chaikin A/D Oscillator
                 - OBV, On Balance Volume
             - Volatility Indicators(波动率指标)

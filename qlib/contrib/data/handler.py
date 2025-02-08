@@ -804,7 +804,7 @@ class MyAlpha158_DyFeature(DataHandlerLP):
         if feature_meta_file is None:
             raise ValueError("feature meta file should be provided")
         self.dynamic_feature_dic = self._load_feature_meta(feature_meta_file)
-        
+
         infer_processors = check_transform_proc(infer_processors, fit_start_time, fit_end_time)
         learn_processors = check_transform_proc(learn_processors, fit_start_time, fit_end_time)
 
@@ -830,10 +830,10 @@ class MyAlpha158_DyFeature(DataHandlerLP):
             process_type=process_type,
             **kwargs
         )
-    
+
     def get_feature_count(self):
         return len(self.get_feature_config()[0])
-    
+
     def _load_feature_meta(self, meta_file):
         with open(meta_file, 'r') as f:
             meta = json.load(f)
@@ -857,23 +857,23 @@ class MyAlpha158_DyFeature(DataHandlerLP):
             print("meta file path: {meta_file}")
             print("meta file content:\n {meta}")
             raise ValueError("feature meta file names should be a list")
-        
+
         ## check fields data format
-        if meta['fields'][0].startswith('$') == False:
+        if meta['fields'][0].startswith('$') is False:
             print(f"{meta_file} fields format should start with '$'")
             print("meta file path: {meta_file}")
             print("meta file content:\n {meta}")
             raise ValueError("feature meta file fields format should start with '$'")
-        
+
         ## fields and names should have the same length
         if meta['fields'] and meta['names'] and len(meta['fields']) != len(meta['names']):
             print(f"{meta_file} fields and names should have the same length")
             print("meta file path: {meta_file}")
             print("meta file content:\n {meta}")
             raise ValueError("feature meta file fields and names should have the same length")
-        
+
         return meta
-    
+
     def get_feature_config(self):
         fields, names = [],[]
         conf = {
@@ -897,4 +897,106 @@ class MyAlpha158_DyFeature(DataHandlerLP):
     def get_label_config(self):
         return ["Ref($open, -2)/Ref($open, -1) - 1"], ["LABEL0"]
 
+class MyAlphaV4(DataHandlerLP):
+    def __init__(
+        self,
+        instruments="csi500",
+        start_time=None,
+        end_time=None,
+        freq="day",
+        infer_processors=[],
+        learn_processors=_DEFAULT_LEARN_PROCESSORS,
+        fit_start_time=None,
+        fit_end_time=None,
+        process_type=DataHandlerLP.PTYPE_A,
+        filter_pipe=None,
+        inst_processors=None,
+        **kwargs
+    ):
+        infer_processors = check_transform_proc(infer_processors, fit_start_time, fit_end_time)
+        learn_processors = check_transform_proc(learn_processors, fit_start_time, fit_end_time)
 
+        data_loader = {
+            "class": "QlibDataLoader",
+            "kwargs": {
+                "config": {
+                    "feature": self.get_feature_config(),
+                    "label": kwargs.pop("label", self.get_label_config()),
+                },
+                "filter_pipe": filter_pipe,
+                "freq": freq,
+                "inst_processors": inst_processors,
+            },
+        }
+        super().__init__(
+            instruments=instruments,
+            start_time=start_time,
+            end_time=end_time,
+            data_loader=data_loader,
+            infer_processors=infer_processors,
+            learn_processors=learn_processors,
+            process_type=process_type,
+            **kwargs
+        )
+    def get_feature_config(self):
+        fields, names = [],[]
+        conf = {
+            "kbar": {},
+            "price": {
+                "windows": [0],
+                "feature": ["OPEN", "HIGH", "LOW", "VWAP"],
+            },
+            "rolling": {},
+        }
+        fields, names = Alpha158DL.get_feature_config(conf)
+        
+        fields += ['$turn','$peTTM', '$pbMRQ', '$psTTM']
+        names += ['TURNOVER', 'PETTM', 'PBMQR', 'PSTTM']
+        ## add baostock basic features
+        ## turn / peTTM / pbMRQ / psTTM / pcfNcfTTM / pbMRQ
+        
+        # fields += ['Ref($turn, 1)/$turn', '$turn', '$peTTM', '$pbMRQ', '$psTTM', '$pcfNcfTTM', '$pbMRQ']
+        # names += ['TURNOVER1', 'TURNOVER0', 'PETTM', 'PBMQR', 'PSTTM', 'PCFNCF', 'PBMQR']
+        
+        # ## v4.0
+        fields += [
+            '$EMA_5', '$EMA_10', '$EMA_20', '$SAR', '$KAMA_12',
+            '$KAMA_24', '$KAMA_48', '$TEMA_12', '$TEMA_24', '$TEMA_48',
+            '$TRIMA_12', '$TRIMA_24', '$TRIMA_48', '$ADX_14', '$ADX_28',
+            '$APO', '$AROON_14_down', '$AROON_14_up', '$AROON_28_down', '$AROON_28_up',
+            '$BOP', '$CCI_14', '$CCI_28', '$CMO_14', '$CMO_28',
+            '$MACD', '$MACD_SIGNAL', '$MACD_HIST', '$MOM_6', '$MOM_12',
+            '$MOM_24', '$MOM_48', '$MFI_6', '$MFI_12', '$MFI_24',
+            '$MFI_48', '$ROC_6', '$ROC_12', '$ROC_24', '$ROC_48',
+            '$RSI_6', '$RSI_12', '$RSI_24', '$STOCHF_k', '$STOCHF_d',
+            '$STOCHRSI_k', '$STOCHRSI_d', '$TRIX_12', '$TRIX_24', '$TRIX_48',
+            '$ULTOSC', '$WILLR_6', '$WILLR_12', '$WILLR_24', '$WILLR_48',
+            '$AD', '$ADOSC', '$OBV', '$ATR_14', '$ATR_28',
+            '$NATR_14', '$NATR_28', '$TRANGE', '$DAILY_AMOUNT_RATIO', '$STR_FACTOR',
+            '$norm_RSRS', '$pos_RSRS' ]
+
+        # v4.0
+        names += [
+            'EMA_5', 'EMA_10', 'EMA_20', 'SAR', 'KAMA_12',
+            'KAMA_24', 'KAMA_48', 'TEMA_12', 'TEMA_24', 'TEMA_48',
+            'TRIMA_12', 'TRIMA_24', 'TRIMA_48', 'ADX_14', 'ADX_28',
+            'APO', 'AROON_14_down', 'AROON_14_up', 'AROON_28_down', 'AROON_28_up',
+            'BOP', 'CCI_14', 'CCI_28', 'CMO_14', 'CMO_28',
+            'MACD', 'MACD_SIGNAL', 'MACD_HIST', 'MOM_6', 'MOM_12',
+            'MOM_24', 'MOM_48', 'MFI_6', 'MFI_12', 'MFI_24',
+            'MFI_48', 'ROC_6', 'ROC_12', 'ROC_24', 'ROC_48',
+            'RSI_6', 'RSI_12', 'RSI_24', 'STOCHF_k', 'STOCHF_d',
+            'STOCHRSI_k', 'STOCHRSI_d', 'TRIX_12', 'TRIX_24', 'TRIX_48',
+            'ULTOSC', 'WILLR_6', 'WILLR_12', 'WILLR_24', 'WILLR_48',
+            'AD', 'ADOSC', 'OBV', 'ATR_14', 'ATR_28',
+            'NATR_14', 'NATR_28', 'TRANGE', 'DAILY_AMOUNT_RATIO', 'STR_FACTOR',
+            'norm_RSRS', 'pos_RSRS']
+
+        return fields, names
+
+    def get_label_config(self):
+        return ["Ref($open, -2)/Ref($open, -1) - 1"], ["LABEL0"]
+    
+    def get_feature_count(self):
+        return len(self.get_feature_config()[0])
+    

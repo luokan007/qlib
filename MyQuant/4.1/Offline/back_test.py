@@ -219,8 +219,8 @@ def main():
     work_dir = '/home/godlike/project/GoldSparrow/Temp_Data'
     provider_uri = "/home/godlike/project/GoldSparrow/Day_Data/Day_data/qlib_data"
 
-    config_file_name = 'config_20250206194432.json'
-    report_file_name = 'report_20250206194432.html'
+    config_file_name = 'config_20250208001737.json'
+    report_file_name = 'report_20250208001737.html'
     
     config_file_path = os.path.join(work_dir, config_file_name)    
     report_file_path = os.path.join(work_dir, report_file_name)
