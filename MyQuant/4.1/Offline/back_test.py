@@ -210,17 +210,17 @@ def main():
     ## 基于自定义预测文件的回测
     # report_file_path = '/home/godlike/project/GoldSparrow/Offline_Report/self_alpha_LSTM_v2.html'
     # output_dir = "/home/godlike/project/GoldSparrow/Temp_Data"
-    #provider_uri = "/home/godlike/project/GoldSparrow/Day_Data/Day_data/qlib_data"
+    #provider_uri = "/home/godlike/project/GoldSparrow/Day_Data/qlib_data"
      # 配置文件路径
      
     # work_dir = '/root/autodl-tmp/GoldSparrow/Temp_Data'
     # provider_uri = "/root/autodl-tmp/GoldSparrow/Day_data/qlib_data"
     
     work_dir = '/home/godlike/project/GoldSparrow/Temp_Data'
-    provider_uri = "/home/godlike/project/GoldSparrow/Day_Data/Day_data/qlib_data"
+    provider_uri = "/home/godlike/project/GoldSparrow/Day_Data/qlib_data"
 
-    config_file_name = 'config_20250209134215.json'#'config_20250209121635.json'
-    report_file_name = 'report_20250209134215.html'#'report_20250209121635.html'
+    config_file_name = 'config_20250209184214.json'#'config_20250209121635.json'
+    report_file_name = 'report_20250209184214.html'#'report_20250209121635.html'
     
     config_file_path = os.path.join(work_dir, config_file_name)    
     report_file_path = os.path.join(work_dir, report_file_name)

@@ -186,5 +186,5 @@ def main(raw_folder: str, max_workers: int = 1) -> None:
                 pbar.update(n=1)
 
 if __name__ == "__main__":
-    raw_folder = "/home/godlike/project/GoldSparrow/Day_Data/Day_data/Raw" # 替换为实际的raw文件夹路径
+    raw_folder = "/home/godlike/project/GoldSparrow/Day_Data/Raw" # 替换为实际的raw文件夹路径
     main(raw_folder)

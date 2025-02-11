@@ -6,7 +6,9 @@ import os
 from pathlib import Path
 import pandas as pd
 from ta_lib_feature import TALibFeatureExt
-from mydump_bin import DumpDataAll
+from MyQuant.MyUtil.mydump_bin import DumpDataAll
+
+
 import json
 
 
@@ -73,7 +75,7 @@ def add_features(data_dir, output_dir,basic_info_path,feature_meta_file,stock_po
 
 if __name__ == "__main__":
     
-    work_folder = "/home/godlike/project/GoldSparrow/Day_Data/Day_data"
+    work_folder = "/home/godlike/project/GoldSparrow/Day_Data"
 
     ## 本地设置
     data_directory = f"{work_folder}/Raw"

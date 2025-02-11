@@ -660,8 +660,8 @@ if __name__ == "__main__":
     print(f"today: {today}")
 
     dm = DataManager(
-        #csv_path=r"/home/godlike/project/GoldSparrow/Day_Data/Day_data/Raw",
-        #qlib_data_path=r"/home/godlike/project/GoldSparrow/Day_Data/Day_data/qlib_data",        
+        #csv_path=r"/home/godlike/project/GoldSparrow/Day_Data/Raw",
+        #qlib_data_path=r"/home/godlike/project/GoldSparrow/Day_data/qlib_data",        
 
         csv_path=r"/root/autodl-tmp/GoldSparrow/Day_data/Raw",
         qlib_data_path=r"/root/autodl-tmp/GoldSparrow/Day_data/qlib_data",

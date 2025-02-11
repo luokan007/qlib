@@ -23,7 +23,7 @@ import akshare as ak
 
 # from qlib_dump_bin import DumpDataAll
 from ta_lib_feature import TALibFeatureExt
-from mydump_bin import DumpDataAll
+from MyQuant.MyUtil.mydump_bin import DumpDataAll
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -657,14 +657,14 @@ class EnhancedDataManager:
             self._merge_data(temp_folder=temp_folder, target_folder=self._csv_path)
         else:
             raise ValueError("Invalid mode")
-        
+
         ##生成特征
         self._add_features(self._csv_path, self._feature_path, self._basic_info_path)
-        
+
         ##删除qlib目录下的calendar和features目录
         shutil.rmtree(f"{self._qlib_data_path}/calendars")
         shutil.rmtree(f"{self._qlib_data_path}/features")
-        
+
         ##保存qlib数据
         self._dump_qlib_data(self._feature_path)
 
@@ -677,30 +677,30 @@ class EnhancedDataManager:
             for file_path in Path(temp_folder).glob('*.csv'):
                 target_file_path = Path(target_folder) / file_path.name
                 temp_df = pd.read_csv(file_path)
-                
+
                 if target_file_path.exists():
                     target_df = pd.read_csv(target_file_path)
-                    merged_df = pd.concat([target_df, temp_df]).drop_duplicates(subset=['date']).sort_values(by='date')
-                    
+                    merged_df = pd.concat([target_df, temp_df]).drop_duplicates(subset=['date']).sort_values(by='date')                    
+
                     ##seasoanl columns需要前向填充
                     seasonal_columns = ['epsTTM', 'totalShare', 'liqaShare']
                     merged_df[seasonal_columns] = merged_df[seasonal_columns].fillna(method='ffill')
                 else:
                     merged_df = temp_df
-                
+
                 merged_df.to_csv(target_file_path, index=False)
                 pbar.update(1)
 
         ## Remove the temporary folder
         print("Removing temporary folder")
         shutil.rmtree(temp_folder)
-            
+
 
 if __name__ == "__main__":
-    
+
     # 下载最新的全市场股票行情
-    today = str(datetime.date.today())
-    print(f"today: {today}")
+    DT_TODAY = str(datetime.date.today())
+    print(f"today: {DT_TODAY}")
 
     # _csv_path=r"/root/autodl-tmp/GoldSparrow/Day_data/Raw"
     # _feature_path=r"/root/autodl-tmp/GoldSparrow/Day_data/Merged_talib"
@@ -708,16 +708,15 @@ if __name__ == "__main__":
     # _basic_info_path='/root/autodl-tmp/GoldSparrow/Day_data/qlib_data/basic_info.csv'
 
     ##本地环境
-    work_folder = "/home/godlike/project/GoldSparrow/Day_Data/Day_data"
+    work_folder = "/home/godlike/project/GoldSparrow/Day_data"
 
     _csv_path= f"{work_folder}/Raw"
     _feature_path=f"{work_folder}/Merged_talib"
     _qlib_data_path=f"{work_folder}/qlib_data"
     _basic_info_path=f"{work_folder}/qlib_data/basic_info.csv"
     _feature_meta_file = f"{work_folder}/feature_names.json"
-    #_stock_pool_file = '/home/godlike/project/GoldSparrow/Day_Data/Day_data/qlib_data/instruments/csi300.txt'
+    #_stock_pool_file = '/home/godlike/project/GoldSparrow/Day_Data/qlib_data/instruments/csi300.txt'
     _stock_pool_file = None
-
     dm = EnhancedDataManager(   
 
         csv_path=_csv_path,

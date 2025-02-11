@@ -113,10 +113,11 @@ class MyEval:
         s_c = groups.count()
         return (l_dom.groupby("datetime").sum() / l_c), (s_dom.groupby("datetime").sum() / s_c)
     
-if __name__ == "__main__":
+def __test__():
     test_pred_path = "/home/godlike/project/qlib/qlib/mlruns/2/e43b0f4014c44fe5860cc39717d9d1d6/artifacts/pred.pkl"
     test_label_path = "/home/godlike/project/qlib/qlib/mlruns/2/e43b0f4014c44fe5860cc39717d9d1d6/artifacts/label.pkl"
-    
-    
     eval = MyEval.from_pkl(test_pred_path, test_label_path)
     print(eval.eval())
+    
+if __name__ == "__main__":
+    __test__()

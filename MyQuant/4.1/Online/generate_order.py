@@ -40,8 +40,6 @@ class GenerateOrder:
         self.commission = 0.0005 # 佣金率
         self.cash = 10000000.0
 
-        qlib.init(provider_uri=provider_uri, region="cn")
-
     def generate_order_csv(self):
         """_summary_
 
@@ -203,9 +201,12 @@ def main():
     Path(order_folder_name).mkdir(parents=True, exist_ok=True)
 
     with open(config_file_path,'r') as f:
-        config = json.load(f) 
+        config = json.load(f)
     pkl_path = config['prediction_pkl']
-    provider_uri = config['provider_uri']    
+    provider_uri = config['provider_uri']
+    
+    ## 初始化qlib
+    qlib.init(provider_uri=provider_uri, region="cn")
 
     pred = pd.read_pickle(pkl_path)
 

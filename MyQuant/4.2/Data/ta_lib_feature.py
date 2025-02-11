@@ -4,13 +4,13 @@
         _type_: _description_
 """
 from pathlib import Path
+import json
 import numpy as np
 import pandas as pd
 import talib
 from joblib import Parallel, delayed
 from tqdm import tqdm  
 from rsrs_feature import RSRSFeature
-import json
 
 
 
@@ -105,7 +105,7 @@ class TALibFeatureExt:
 
         self.stock_slice_df = pd.DataFrame()
         self._str_factor_df = pd.DataFrame()
-        
+
         if stock_pool_path is not None:
             with open(stock_pool_path, 'r') as f:
                 self.stock_pool = set()
@@ -113,12 +113,10 @@ class TALibFeatureExt:
                     parts = line.strip().split()
                     if parts:
                         self.stock_pool.add(parts[0].lower())
-            
+
             print(f"Using stock pool. Loaded {len(self.stock_pool)} stocks from {stock_pool_path}")
         else:
             self.stock_pool = None
-        
-
 
     def _create_stock_slice_df(self, stock_data):
         """创建包含日期、代码、涨跌幅和成交量的数据框"""
@@ -138,7 +136,7 @@ class TALibFeatureExt:
 
         self.amount_df['amount'] = self.stock_slice_df.groupby(level='date')['amount'].sum()
         #print(self.amount_df)
-        
+
         ## 计算每只股票在当天涨跌幅中的排名，并取对数
         self.rank_df['rank'] = self.stock_slice_df['pctChg'].groupby(level='date').rank(ascending=False)
         #print(self.rank_df.head())
@@ -170,7 +168,7 @@ class TALibFeatureExt:
         # 2008-01-04     17
         # 2008-01-07     17
         # 2008-01-08     17
-        
+
 
         ##计算STR凸显性因子
         return_df = pd.DataFrame()
@@ -831,25 +829,167 @@ class TALibFeatureExt:
                 output_path = Path(output_dir) / file_name
                 df.to_csv(output_path)
 
-def __test__():
-    # 测试特征生成器
-    
-    ## 云主机地址    
-    #basic_info_path = '/root/autodl-tmp/GoldSparrow/Day_data/qlib_data/basic_info.csv'
-    #in_folder = '/root/autodl-tmp/GoldSparrow/Day_data/test_raw'
-    #out_folder = '/root/autodl-tmp/GoldSparrow/Day_data/test_raw_ta'
-    # feature_meta_file = '/root/autodl-tmp/GoldSparrow/Day_data/feature_names.json'
-    # stock_pool_file = '/root/autodl-tmp/GoldSparrow/Day_data/qlib_data/instruments/csi300.txt'
+    def _check_file_status(self, input_path: Path, output_path: Path) -> dict:
+        """检查文件状态，判断是否需要更新
+        
+        Args:
+            input_path: 输入文件路径
+            output_path: 输出文件路径
+            
+        Returns:
+            dict: {
+                'needs_update': bool,  # 是否需要更新
+                'last_date': pd.Timestamp,  # 最后更新日期
+                'history_start': pd.Timestamp,  # 需要的历史数据起始日期
+                'input_df': pd.DataFrame,  # 输入数据
+                'existing_df': pd.DataFrame,  # 已存在的数据
+            }
+        """
+        max_history_window = max(48, self.time_range)  # EMA=48, STR=time_range
+        
+        # 读取输入文件
+        input_df = pd.read_csv(input_path, index_col=0, parse_dates=True)
+        
+        if not output_path.exists():
+            return {
+                'needs_update': True,
+                'last_date': None,
+                'history_start': None,
+                'input_df': input_df,
+                'existing_df': None
+            }
+            
+        # 读取已存在的输出文件
+        existing_df = pd.read_csv(output_path, index_col=0, parse_dates=True)
+        last_date = existing_df.index.max()
+        
+        # 检查是否需要更新
+        needs_update = input_df.index.max() > last_date
+        
+        if needs_update:
+            history_start = last_date - pd.Timedelta(days=max_history_window)
+        else:
+            history_start = None
+            
+        return {
+            'needs_update': needs_update,
+            'last_date': last_date,
+            'history_start': history_start,
+            'input_df': input_df,
+            'existing_df': existing_df
+        }
 
-    ##本地地址
+    def _process_stock_data_incremental(self, file_name: str, df: pd.DataFrame, 
+                                      output_path: Path, last_date=None):
+        """增量处理单个股票数据"""
+        try:
+            code = file_name.split('.')[0]
+            
+            # 生成新特征
+            new_features = self.generate_single_stock_features(df)
+            slice_features = self.generate_slice_features(code)
+            rsrs_features = self.generate_rsrs_features(df)
+            
+            # 合并特征
+            result = pd.concat([df, new_features, slice_features, rsrs_features], axis=1)
+            
+            # 如果是增量更新，合并新旧数据
+            if last_date is not None:
+                # 读取已有数据
+                existing_df = pd.read_csv(output_path, index_col=0, parse_dates=True)
+                # 保留旧数据中不需要更新的部分
+                old_data = existing_df[existing_df.index <= last_date]
+                # 从新计算的结果中只保留需要更新的部分
+                new_data = result[result.index > last_date]
+                # 合并新旧数据
+                result = pd.concat([old_data, new_data])
+                
+            # 保存结果
+            result.to_csv(output_path)
+            return result.columns.tolist()
+            
+        except Exception as e:
+            print(f"Error processing {file_name}: {e}")
+            return []
+
+    def process_directory_incremental(self, input_dir, output_dir, feature_meta_file=None):
+        """增量处理整个目录的CSV文件"""
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
+
+        print("Scanning files...")
+        stock_data = {}
+        update_files = []
+        effective_count = 0
+        empty_count = 0
+        short_count = 0
+
+        # 1. 扫描文件并检查更新状态
+        for file_path in Path(input_dir).glob('*.csv'):
+            filename = file_path.name
+            output_path = Path(output_dir) / filename
+
+            if any(code in filename for code in self.stock_codes_set):
+                try:
+                    status = self._check_file_status(file_path, output_path)
+
+                    if status['input_df'].empty:
+                        empty_count += 1
+                        continue
+
+                    if len(status['input_df']) < self.minimum_data_length:
+                        short_count += 1
+                        continue
+
+                    if status['needs_update']:
+                        stock_data[filename] = status['input_df']
+                        update_files.append({
+                            'filename': filename,
+                            'status': status,
+                            'output_path': output_path
+                        })
+                        effective_count += 1
+
+                except Exception as e:
+                    print(f"Error checking {filename}: {e}")
+                    
+        print(f"Found {len(update_files)} files to update")
+        
+        if not update_files:
+            print("No files need to be updated.")
+            return
+            
+        # 2. 计算横截面特征
+        print("Calculating cross-sectional features...")
+        self.pre_process_slice_features(stock_data)
+        
+        # 3. 并行处理需要更新的文件
+        print("Processing updates...")
+        results = Parallel(n_jobs=-1)(
+            delayed(self._process_stock_data_incremental)(
+                file_info['filename'],
+                stock_data[file_info['filename']],
+                file_info['output_path'],
+                file_info['status']['last_date']
+            )
+            for file_info in tqdm(update_files, desc="Updating files")
+        )
+        
+        print(f"Successfully processed {len(results)} files")
+
+def __test__():
     basic_info_path = '/home/godlike/project/GoldSparrow/Day_Data/qlib_data/basic_info.csv'
     in_folder = '/home/godlike/project/GoldSparrow/Day_Data/test_raw'
-    out_folder = '/home/godlike/project/GoldSparrow/Day_data/test_raw_ta'
-    feature_meta_file = '/home/godlike/project/GoldSparrow/Day_data/feature_names.json'
-    stock_pool_file = '/home/godlike/project/GoldSparrow/Day_data/qlib_data/instruments/csi300.txt'
+    out_folder = '/home/godlike/project/GoldSparrow/Day_Data/test_raw_ta'
+    feature_meta_file = '/home/godlike/project/GoldSparrow/Day_Data/feature_names.json'
+    stock_pool_file = '/home/godlike/project/GoldSparrow/Day_Data/qlib_data/instruments/csi300.txt'
 
-    feature_generator = TALibFeatureExt(basic_info_path=basic_info_path,time_range = 5,stock_pool_path=stock_pool_file)
-    feature_generator.process_directory(in_folder, out_folder,feature_meta_file)
+    feature_generator = TALibFeatureExt(
+        basic_info_path=basic_info_path,
+        time_range=30,
+        stock_pool_path=stock_pool_file
+    )
+    # 使用增量更新方法
+    feature_generator.process_directory_incremental(in_folder, out_folder, feature_meta_file)
 
 if __name__ == '__main__':
     __test__()

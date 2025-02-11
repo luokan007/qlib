@@ -70,4 +70,3 @@ class RSRSFeature:
 
 if __name__ == "__main__":
     RSRSFeature.__test__()
-

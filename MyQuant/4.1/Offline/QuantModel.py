@@ -200,9 +200,9 @@ config_lstm = {
     # 'provider_uri': "/root/autodl-tmp/GoldSparrow/Day_data/qlib_data",
     # 'output_dir': "/root/autodl-tmp/GoldSparrow/Temp_Data",
     # 'feature_meta_file': '/root/autodl-tmp/GoldSparrow/Day_data/qlib_data/feature_meta.json',
-    'provider_uri': "/home/godlike/project/GoldSparrow/Day_Data/Day_data/qlib_data",
+    'provider_uri': "/home/godlike/project/GoldSparrow/Day_Data/qlib_data",
     'output_dir': "/home/godlike/project/GoldSparrow/Temp_Data",
-    'feature_meta_file': '/home/godlike/project/GoldSparrow/Day_Data/Day_data/feature_names.json',
+    'feature_meta_file': '/home/godlike/project/GoldSparrow/Day_Data/feature_names.json',
     'pool': 'csi300',
     'train': ('2008-01-01', '2020-12-31'),
     'valid': ('2021-01-01', '2022-12-31'),
@@ -239,8 +239,8 @@ config_alstm = {
     'model_params': {
         'd_feat': 306,
         'hidden_size': 64,
-        'num_layers': 2,
-        'dropout': 0,
+        'num_layers': 3,
+        'dropout': 0.2,
         'n_epochs': 20,
         'lr': 0.00001,
         'early_stop': 10,
@@ -283,10 +283,10 @@ if __name__ == "__main__":
     #                     "SUMP30","KAMA_48","CNTN20","VSUMN10","ATR_28","SAR","KAMA_12","SUMN30","CNTP30","EMA_5",
     #                     "CNTP5","VSUMP30","SUMP20","IMIN5","IMAX10","CNTP10","VSUMN30","CNTD5","CNTD60","CNTP60",
     #                     "SUMD30","CNTP20","VSUMN60","IMAX20","VSUMN20","IMAX30","SUMN20","EMA_10","VSUMD5","SUMD60",
-    #                     "IMIN20","VSUMD60","EMA_20","KAMA_24","VSUMD10","VSUMD20","SUMD20","AROON_14_up","VSUMD30"]
+    #                     "IMIN20","VSUMD60","EMA_20","KAMA_24","VSUMD10","VSUMD20", "SUMD20","AROON_14_up","VSUMD30"]
     
-    ## Alpha 158 + turn/pettm/pbmqr/psttm + STR + RSRS + size - VWAP0
-    selected_features = ['TURN_MAX_20','AMT_VAR_40','AMT_VAR_5',
+    ## Alpha 158 + turn/pettm/pbmqr/psttm + STR + RSRS + size
+    selected_features = ["AMT_VAR_5", "AMT_VAR_40",
                         "VWAP0","DAILY_AMOUNT_RATIO","TRIX_48","RESI10","ULTOSC","RESI5","STOCHF_k","QTLD5","KLOW2","STD30",
                         "CORD30","ADOSC","MIN60","STD20","PBMQR","RSQR5","ADX_14","KUP2","RESI20",
                         "RSQR10","STD60","QTLU5","CORD20","STR_FACTOR","STOCHRSI_k","STOCHF_d","AD","RSV5","CCI_14",
@@ -363,7 +363,7 @@ if __name__ == "__main__":
     #                      'SUMD30', 'AROON_14_up',  'KAMA_48', 'VSUMD20',  'CNTN30']
     
     ## RSRS 去除TSF和schotastic，
-    # selected_features = ['norm_RSRS','pos_RSRS',
+    # selected_features = ['norm_RSRS','pos_RSRS', 
     #                      'VWAP0', 'TRIX_48', 'RESI10', 'DAILY_AMOUNT_RATIO', 'RESI5', 'KUP2', 
     #                      'HIGH0', 'ULTOSC', 'CORD30', 'QTLD5', 'WILLR_6', 'STD60', 'STD20',  
     #                      'CORD5', 'RSQR5',    'STD30', 'STD5', 'QTLU5',

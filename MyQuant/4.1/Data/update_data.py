@@ -708,14 +708,14 @@ if __name__ == "__main__":
     # _basic_info_path='/root/autodl-tmp/GoldSparrow/Day_data/qlib_data/basic_info.csv'
 
     ##本地环境
-    work_folder = "/home/godlike/project/GoldSparrow/Day_Data/Day_data"
+    work_folder = "/home/godlike/project/GoldSparrow/Day_Data/"
 
     _csv_path= f"{work_folder}/Raw"
     _feature_path=f"{work_folder}/Merged_talib"
     _qlib_data_path=f"{work_folder}/qlib_data"
     _basic_info_path=f"{work_folder}/qlib_data/basic_info.csv"
     _feature_meta_file = f"{work_folder}/feature_names.json"
-    #_stock_pool_file = '/home/godlike/project/GoldSparrow/Day_Data/Day_data/qlib_data/instruments/csi300.txt'
+    #_stock_pool_file = '/home/godlike/project/GoldSparrow/Day_Data/qlib_data/instruments/csi300.txt'
     _stock_pool_file = None
 
     dm = EnhancedDataManager(   

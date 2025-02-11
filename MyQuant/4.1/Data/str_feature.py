@@ -123,11 +123,11 @@ class STRFeature:
 
 def __test__():
     # 测试特征生成器
-    basic_info_path = '/home/godlike/project/GoldSparrow/Day_Data/Day_data/qlib_data/basic_info.csv'
-    qlib_folder = '/home/godlike/project/GoldSparrow/Day_Data/Day_data/qlib_data'
+    basic_info_path = '/home/godlike/project/GoldSparrow/Day_Data/qlib_data/basic_info.csv'
+    qlib_folder = '/home/godlike/project/GoldSparrow/Day_Data/qlib_data'
     feature_generator = STRFeature(basic_info_path=basic_info_path, qlib_provider_uri=qlib_folder)
-    in_folder = '/home/godlike/project/GoldSparrow/Day_Data/Day_data/test_raw'
-    out_folder = '/home/godlike/project/GoldSparrow/Day_Data/Day_data/test_raw_ta'
+    in_folder = '/home/godlike/project/GoldSparrow/Day_Data/test_raw'
+    out_folder = '/home/godlike/project/GoldSparrow/Day_Data/test_raw_ta'
     feature_generator.process_directory(in_folder, out_folder)
 
 if __name__ == '__main__':
