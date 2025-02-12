@@ -601,14 +601,15 @@ class EnhancedDataManager:
                                                time_range=30,
                                                 stock_pool_path = self._stock_pool_file)
 
-        if os.path.exists(output_dir) and os.path.isdir(output_dir):
-            # 使用 shutil.rmtree 高效地移除整个目录树
-            shutil.rmtree(output_dir)
-
-        # # 重新创建目录
+        ## 新版本支持增量更新，无需删除整个目录树
+        # if os.path.exists(output_dir) and os.path.isdir(output_dir):
+        #     # 使用 shutil.rmtree 高效地移除整个目录树
+        #     shutil.rmtree(output_dir)
+        # 重新创建目录
         Path(output_dir).mkdir(parents=True, exist_ok=True)
-        ta_feature_generator.process_directory(data_dir, output_dir,self._feature_meta_file)
-    
+
+        ta_feature_generator.process_directory_incremental(data_dir, output_dir, self._feature_meta_file)
+
     def fetch_and_save_data(
         self,
         use_cached_basic_info: bool = False,

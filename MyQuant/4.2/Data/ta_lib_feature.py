@@ -20,6 +20,8 @@ class TALibFeatureExt:
     def __init__(self, basic_info_path,time_range = 30, stock_pool_path = None):
         """初始化特征生成器"""
         # 定义要生成的技术指标及其参数
+        self.window_size_global = max(time_range, 60) ###time_range是STR因子所需的时间窗口，48是EMA等ta-lib因子所需的时间窗口,取60是一个更加安全的边界
+        self.window_size_rsrs = 550 ## RSRS因子需要500天的时间窗口+50天的time_range
         
         self.time_range = time_range
         
@@ -123,7 +125,7 @@ class TALibFeatureExt:
         print("Creating stock slice DataFrame...")
         dataframes = []
         for file_name, df in stock_data.items():
-            if not df.empty and len(df) >= self.minimum_data_length:
+            if not df.empty:
                 code = file_name.split('.')[0]
                 df_reset = df.reset_index()
                 df_reset['code'] = code
@@ -175,6 +177,22 @@ class TALibFeatureExt:
         return_df['pctChg'] = self.stock_slice_df['pctChg']
         # 将 'code' 转换为列，使得每个 'code' 都有一列
         pivot_return_df = return_df.unstack(level='code')
+        #print(pivot_return_df)
+#          pctChg                                                                                            ...                                                                                                   
+# code       sh600300 sh600301 sh600302 sh600303 sh600305 sh600306 sh600307 sh600308 sh600309 sh600310 sh600311  ... sh600888 sh600889 sh600890 sh600891 sh600892 sh600893 sh600894 sh600895 sh600896 sh600897 sh600898
+# date                                                                                                           ...                                                                                                   
+# 2009-04-15      NaN      NaN      NaN      NaN      NaN      NaN      NaN      NaN      NaN      NaN      NaN  ...      NaN      NaN      NaN      NaN      NaN      NaN      NaN      NaN      NaN      NaN      NaN
+# 2009-04-16      NaN      NaN      NaN      NaN      NaN      NaN      NaN      NaN      NaN      NaN      NaN  ...      NaN      NaN      NaN      NaN      NaN      NaN      NaN      NaN      NaN      NaN      NaN
+# 2009-04-17      NaN      NaN      NaN      NaN      NaN      NaN      NaN      NaN      NaN      NaN      NaN  ...      NaN      NaN      NaN      NaN      NaN      NaN      NaN      NaN      NaN      NaN      NaN
+# 2009-04-20      NaN      NaN      NaN      NaN      NaN      NaN      NaN      NaN      NaN      NaN      NaN  ...      NaN      NaN      NaN      NaN      NaN      NaN      NaN      NaN      NaN      NaN      NaN
+# 2009-04-21      NaN      NaN      NaN      NaN      NaN      NaN      NaN      NaN      NaN      NaN      NaN  ...      NaN      NaN      NaN      NaN      NaN      NaN      NaN      NaN      NaN      NaN      NaN
+# ...             ...      ...      ...      ...      ...      ...      ...      ...      ...      ...      ...  ...      ...      ...      ...      ...      ...      ...      ...      ...      ...      ...      ...
+# 2025-01-27  10.0334  -0.9556   0.0000  -0.3597   0.5355      NaN   0.0000   1.1730   0.8091  -0.4902      NaN  ...   0.1427  -9.8867      NaN      NaN   3.6424   0.0268   2.4162  -3.4068      NaN   0.8253      NaN
+# 2025-02-05   0.3040   0.9081   3.5941  -0.3610  -0.1332      NaN   2.0408  -0.8696  -1.1674  -1.7241      NaN  ...  -0.2849   1.3143      NaN      NaN  -1.9169   1.6069  -5.4795   2.3651      NaN  -1.2278      NaN
+# 2025-02-06   0.3030   2.6434   0.4082   0.7246   0.1333      NaN   0.6667   4.0936  -0.9006   2.0050      NaN  ...   0.5714   9.9831      NaN      NaN   2.2801   2.8730  -1.0467   4.0130      NaN   0.1381      NaN
+# 2025-02-07   1.2085  -0.8219   0.0000   3.9568   0.5326      NaN   1.3245   0.2809   2.5179   0.9828      NaN  ...   0.7102   1.7949      NaN      NaN   3.1847  -0.5124   0.0814   1.8706      NaN  -0.0690      NaN
+# 2025-02-10   3.5821  -0.6630   1.4228   2.0761   0.6623      NaN   3.2680  -0.2801   3.6187   0.7299      NaN  ...  -0.5642   0.5038      NaN      NaN   6.4815  -0.1288  -0.9756   2.1423      NaN   0.5521      NaN
+        
         print("generate STR factors...")
         # 使用新的优化函数来计算每天的STR因子
         self._str_factor_df = self.calculate_daily_str_factors(pivot_return_df)
@@ -257,6 +275,9 @@ class TALibFeatureExt:
         Returns:
             pd.DataFrame: 每天的STR因子数据框，其中索引是日期，列为不同的股票代码。
         """
+        ## 检查pivot_return_df每一行的数据，如果空值大于5条，则drop掉该行，并打印drop掉的行的索引
+        pivot_return_df = pivot_return_df.dropna(thresh=pivot_return_df.shape[1] - 5)
+
         time_range = self.time_range
         # 创建一个空的DataFrame来存储每天的STR因子
         str_factors = pd.DataFrame(index=pivot_return_df.index, columns=pivot_return_df.columns)
@@ -272,6 +293,11 @@ class TALibFeatureExt:
 
         # 遍历每一天
         dates_to_process = pivot_return_df.index[time_range:]
+        results = []
+        
+        # for date in tqdm(dates_to_process, desc='Calculating STR factors'):
+        #     result = _calculate_str_factor_for_date(date, sigma, pivot_return_df)
+        #     results.append(result)
         
         # 使用joblib进行并行计算
         results = Parallel(n_jobs=n_jobs)(
@@ -332,12 +358,39 @@ class TALibFeatureExt:
         #     print("Column 'sz002092' not found in the DataFrame.")
             
             
-        #str_series = self._str_factor_df[('pctChg', code)]
+        str_series = self._str_factor_df[('pctChg', code)]
+
+        # ## object对象，导致后续错误，debug其中的原因
+        # print(str_series.dtypes)
+        # #(a) 检查列中的唯一值
+        # print(str_series.unique())
+        # #  [nan 0.1392545056732077 0.1579105844503957 0.07848061706044696
+        # #  0.06342289740362128 0.03961372798913102 0.07275462601001799
+        # #  0.061139080350342906 0.06579270155596961 -0.0067452817056449545
+        # #  0.11665692584030171 0.05213464940148926 -0.02388937946936449
+        # #  -0.056990625291462454 0.7655954345992414 0.7534942850249533
+        # #  0.7883460276467572 0.7742736673486761 0.7479054342338002
+        # #  0.8003399995687005 0.8959945560724697 0.8775964181158891
+        # #  0.9420927766658975 0.9153309509933375 0.9490285167653411
+        # #  0.8888593326544392 0.8578108862074821 0.9112028759061824
+        # #  0.8235432169897992 0.9252993605752655 0.8681914564561273
+        # #  0.8819553958457887 0.9061086749153077 0.9789989556008282
+        # #  0.8807629972296485 0.8903476271546746]
+
+        # #(b) 检查是否有非数值数据
+        # print(str_series.apply(lambda x: isinstance(x, str)).any())  # 是否有字符串—————— False
+        # print(str_series.apply(lambda x: isinstance(x, (int, float))).all())  # 是否全是数值 ———— True
+
+        # # (c) 检查是否有 NaN 或 None
+        # print(str_series.isnull().sum())  # 缺失值数量———— 30
+
         #print(str_series)
-        
-        
-        features["STR_FACTOR"] = self._str_factor_df[('pctChg', code)]
-        
+
+        str_series = pd.to_numeric(str_series, errors='coerce')
+        #print(str_series.dtype)  # 应输出 float64
+
+        features["STR_FACTOR"] = str_series # self._str_factor_df[('pctChg', code)]
+
         ## step 3:计算涨跌幅排名
         rank_series = self.rank_df.loc[(slice(None), code), ['rank']]
         rank_series = rank_series.reset_index(level='code', drop=True)
@@ -584,19 +637,21 @@ class TALibFeatureExt:
     
         
         ## Amount，成交量相关指标
-        df['TURN_RATE_LN'] = np.log(df[turn_col]+0.00001)
+        
+        turn_rate_df = pd.DataFrame()
+        turn_rate_df['TURN_RATE_LN'] = np.log(df[turn_col] + 0.00001)
         turn_ln_col = 'TURN_RATE_LN'
         ## AMOUNT_LN, 成交量的对数
-        features[turn_ln_col] = df[turn_ln_col]
+        features[turn_ln_col] = turn_rate_df['TURN_RATE_LN']
         
         ## Math, 数学运算
         ## TURN_MAX, 成交量的对数的最大值
         for period in self.feature_functions['TURN_MAX']['timeperiod']:
-            features[f'TURN_MAX_{period}'] = talib.MAX(df[turn_ln_col], timeperiod=period)
+            features[f'TURN_MAX_{period}'] = talib.MAX(turn_rate_df[turn_ln_col], timeperiod=period)
         
         ## TURN_MIN, 成交量的对数的最小值
         for period in self.feature_functions['TURN_MIN']['timeperiod']:
-            features[f'TURN_MIN_{period}'] = talib.MIN(df[turn_ln_col], timeperiod=period)
+            features[f'TURN_MIN_{period}'] = talib.MIN(turn_rate_df[turn_ln_col], timeperiod=period)
         
         ## TURN_STD, 成交量的对数的标准差
         #for period in self.feature_functions['TURN_STD']['timeperiod']:
@@ -604,73 +659,72 @@ class TALibFeatureExt:
             
         # EMA
         for period in self.feature_functions['TURN_RATE_EMA']['timeperiod']:
-            features[f'TURN_RATE_EMA_{period}'] = talib.EMA(df[turn_ln_col], timeperiod=period)
+            features[f'TURN_RATE_EMA_{period}'] = talib.EMA(turn_rate_df[turn_ln_col], timeperiod=period)
 
         ## Turnover Rate ROC
         for period in self.feature_functions['TURN_ROC']['timeperiod']:
-            features[f'TURN_ROC_{period}'] = talib.ROC(df[turn_ln_col], timeperiod=period)
+            features[f'TURN_ROC_{period}'] = talib.ROC(turn_rate_df[turn_ln_col], timeperiod=period)
 
         ## Turnover Rate SLOPE
         for period in self.feature_functions['TURN_SLOPE']['timeperiod']:
-            features[f'TURN_SLOPE_{period}'] = talib.LINEARREG_SLOPE(df[turn_ln_col], timeperiod=period)
+            features[f'TURN_SLOPE_{period}'] = talib.LINEARREG_SLOPE(turn_rate_df[turn_ln_col], timeperiod=period)
         
         ## Turnover Rate RSI
         for period in self.feature_functions['TURN_RSI']['timeperiod']:
-            features[f'TURN_RSI_{period}'] = talib.RSI(df[turn_ln_col], timeperiod=period)
+            features[f'TURN_RSI_{period}'] = talib.RSI(turn_rate_df[turn_ln_col], timeperiod=period)
           
         ## Turnover Rate TSF
         for period in self.feature_functions['TURN_TSF']['timeperiod']:
-            features[f'TURN_TSF_{period}'] = talib.SUB(df[turn_ln_col], talib.TSF(df[turn_ln_col], timeperiod=period))
-            
+            features[f'TURN_TSF_{period}'] = talib.SUB(turn_rate_df[turn_ln_col], talib.TSF(turn_rate_df[turn_ln_col], timeperiod=period))
 
-            
-        ## Amount，成交量相关指标
-        df['AMOUNT_LN'] = np.log(df[amount_col]+1)
-        amount_ln_col = 'AMOUNT_LN'
         ## AMOUNT_LN, 成交量的对数
-        features[amount_ln_col] = df[amount_ln_col]
+        amount_rate_df = pd.DataFrame()
+        amount_ln_col = 'AMOUNT_LN'
+        amount_rate_df[amount_ln_col] = np.log(df[amount_col]+1)
+        features[amount_ln_col] = amount_rate_df[amount_ln_col]
         
         ## Math, 数学运算
         ## AMT_MAX, 成交量的对数的最大值
         for period in self.feature_functions['AMT_MAX']['timeperiod']:
-            features[f'AMT_MAX_{period}'] = talib.MAX(df[amount_ln_col], timeperiod=period)
+            features[f'AMT_MAX_{period}'] = talib.MAX(amount_rate_df[amount_ln_col], timeperiod=period)
         
         ## AMT_MIN, 成交量的对数的最小值
         for period in self.feature_functions['AMT_MIN']['timeperiod']:
-            features[f'AMT_MIN_{period}'] = talib.MIN(df[amount_ln_col], timeperiod=period)
+            features[f'AMT_MIN_{period}'] = talib.MIN(amount_rate_df[amount_ln_col], timeperiod=period)
         
         ## AMT_STD, 成交量的对数的标准差
         #for period in self.feature_functions['AMT_STD']['timeperiod']:
-        #    features[f'AMT_STD_{period}'] = talib.STDDEV(df[amount_ln_col], timeperiod=period)
+        #    features[f'AMT_STD_{period}'] = talib.STDDEV(amount_rate_df[amount_ln_col], timeperiod=period)
         
         ## Overlap/Momentum/Statistics
         ## AMT_EMA
         for period in self.feature_functions['AMT_EMA']['timeperiod']:
-            features[f'AMT_EMA_{period}'] = talib.EMA(df[amount_ln_col], timeperiod=period)
+            features[f'AMT_EMA_{period}'] = talib.EMA(amount_rate_df[amount_ln_col], timeperiod=period)
         
         ## AMT_ROC
         for period in self.feature_functions['AMT_ROC']['timeperiod']:
-            features[f'AMT_ROC_{period}'] = talib.ROC(df[amount_ln_col], timeperiod=period)
+            features[f'AMT_ROC_{period}'] = talib.ROC(amount_rate_df[amount_ln_col], timeperiod=period)
 
         ## AMT_TRIX
         for period in self.feature_functions['AMT_TRIX']['timeperiod']:
-            features[f'AMT_TRIX_{period}'] = talib.TRIX(df[amount_ln_col], timeperiod=period)
+            features[f'AMT_TRIX_{period}'] = talib.TRIX(amount_rate_df[amount_ln_col], timeperiod=period)
         
         ## AMT_SLOPE, Linear Regression Slope
         for period in self.feature_functions['AMT_SLOPE']['timeperiod']:
-            features[f'AMT_SLOPE_{period}'] = talib.LINEARREG_SLOPE(df[amount_ln_col], timeperiod=period)
+            features[f'AMT_SLOPE_{period}'] = talib.LINEARREG_SLOPE(amount_rate_df[amount_ln_col], timeperiod=period)
         
         ## AMT_RSI
         for period in self.feature_functions['AMT_RSI']['timeperiod']:
-            features[f'AMT_RSI_{period}'] = talib.RSI(df[amount_ln_col], timeperiod=period)
+            features[f'AMT_RSI_{period}'] = talib.RSI(amount_rate_df[amount_ln_col], timeperiod=period)
         
         ## AMT_TSF
         for period in self.feature_functions['AMT_TSF']['timeperiod']:
-            features[f'AMT_TSF_{period}'] = talib.SUB( df[amount_ln_col] ,talib.TSF(df[amount_ln_col], timeperiod=period))
+            features[f'AMT_TSF_{period}'] = talib.SUB( amount_rate_df[amount_ln_col] ,talib.TSF(amount_rate_df[amount_ln_col], timeperiod=period))
         
         ## AMT_VAR
         for period in self.feature_functions['AMT_VAR']['timeperiod']:
-            features[f'AMT_VAR_{period}'] = talib.VAR(df[amount_ln_col], timeperiod=period)
+            features[f'AMT_VAR_{period}'] = talib.VAR(amount_rate_df[amount_ln_col], timeperiod=period)
+
         return pd.DataFrame(features, index=df.index)
     
     def generate_rsrs_features(self, df):
@@ -686,148 +740,9 @@ class TALibFeatureExt:
         # 确保数据列名符合预期
         assert 'high' in df.columns
         assert 'low' in df.columns
-        df = df[['high', 'low']].copy()
 
         ## RSRS
         return RSRSFeature.calculate_rsrs_features(df=df, time_range=20,window_size=500) ##2年的数据作为时间窗口
-        
-        
-
-    def _process_stock_data(self, file_name, df, output_dir):
-        code = file_name.split('.')[0]
-        # 生成新特征
-        new_features = self.generate_single_stock_features(df)
-        slice_features = self.generate_slice_features(code)
-        rsrs_features = self.generate_rsrs_features(df)
-        # 合并特征
-        #result = pd.concat([df, new_features, slice_features], axis=1)
-        result = pd.concat([df, new_features, slice_features,rsrs_features], axis=1)
-        output_path = Path(output_dir) / file_name
-        result.to_csv(output_path)
-        #columns = new_features.columns.tolist() + slice_features.columns.tolist()
-        columns = new_features.columns.tolist() + slice_features.columns.tolist() + rsrs_features.columns.tolist()
-        return columns
-
-    def process_directory(self, input_dir, output_dir,feature_meta_file = None):
-        """处理整个目录的CSV文件"""
-        
-        # 创建输出目录
-        Path(output_dir).mkdir(parents=True, exist_ok=True)
-        
-        # 读取所有CSV文件
-        print("Reading files for 1st round...")
-        stock_data = {}
-        non_stock_data = {}
-        effective_count = 0
-        empty_count = 0
-        short_count = 0
-        csv_files = Path(input_dir).glob('*.csv')
-        print(f"{input_dir} have {len(list(csv_files))} files")
-        for file_path in Path(input_dir).glob('*.csv'):
-            filename = file_path.name
-            stock_id = filename.rsplit('.', 1)[0]
-        
-
-            if any(code in filename for code in self.stock_codes_set): # 如果是股票
-                try:
-                    if self.stock_pool is not None and stock_id not in self.stock_pool:
-                        continue
-                     # 读取CSV文件,索引列为第一列，
-                    df = pd.read_csv(file_path, index_col=0, parse_dates=True)
-### 读取的数据格式如下：
-# date,open,high,low,close,preclose,volume,amount,turn,tradestatus,pctChg,isST,peTTM,pbMRQ,psTTM,pcfNcfTTM,foreAdjustFactor,backAdjustFactor,adjustFactor,factor,vwap,epsTTM,totalShare,liqaShare
-# 2008-01-02,44.80247325,45.67666785,43.78257955,45.4581192,44.36537595,9930800.0,61302049.0,2.203873,1.0,2.463048,0.0,1791.807669,4.420813,1.68484,-18.929168,1.0,1.0,1.0,1.0,6.172921516896927,0.003483,623700000.00,450606738.00
-# 2008-01-03,45.38526965,46.9151102,44.94817235,46.4780129,45.4581192,15608075.0,98710863.0,3.463791,1.0,2.243595,0.0,1832.008482,4.519998,1.722641,-19.353861,1.0,1.0,1.0,1.0,6.3243457633308395,0.003483,623700000.00,450606738.00
-                    if df.empty: # 去除空数据
-                        print(f"Empty file: {file_path.name}")
-                        empty_count += 1
-                        continue
-
-                    # 如果数据长度不足，则跳过
-                    if len(df) < self.minimum_data_length:
-                        #print(f"Data too short: {file_path.name}")
-                        short_count += 1
-                        continue
-
-                    stock_data[file_path.name] = df
-                    effective_count += 1
-                except Exception as e:
-                    print(f"Error reading {file_path.name}: {str(e)}")
-            else:
-                #print(f"Reading non-stock file: {file_path.name}")
-                df = pd.read_csv(file_path, parse_dates=['date'])
-                non_stock_data[file_path.name] = df
-
-            if self.index_code in filename: # 如果是指数
-                print(f"Reading index file: {file_path.name}")
-                df = pd.read_csv(file_path, parse_dates=['date'])
-
-                # 提取需要的列
-                self.index_df = df[['date', 'pctChg']]
-                self.index_df.set_index('date', inplace=True)
-        total_count = len(list(Path(input_dir).glob('*.csv')))
-        print(f"Total files: {total_count}, Stock files: {len(stock_data)}, Non-stock files: {len(non_stock_data)}")
-        print(f"Effective files: {effective_count}, Empty files: {empty_count}, Short files: {short_count}")
-
-        ##计算横截面特征，需要先计算全局数据
-        self.pre_process_slice_features(stock_data)
-        feature_names = set()
-        # 处理每个CSV文件
-        # 
-        # for file_name, df in tqdm(stock_data.items(), desc="Process stock data...", unit="file"):
-        #     try:
-        #         cols_new = self._process_stock_data(file_name, df, output_dir)
-        #         feature_names.update(cols_new)
-        #     except Exception as e:
-        #         print(f"Error processing {file_name}: {str(e)}")
-                
-        # 使用joblib进行并行计算
-        results = Parallel(n_jobs=-1)(
-            delayed(self._process_stock_data)(file_name, df, output_dir)
-            for file_name, df in tqdm(stock_data.items(), desc="Process stock data...", unit="file")
-        )
-
-        # 更新特征名称
-        for cols_new in results:
-            feature_names.update(cols_new)
-        
-        # with ProcessPoolExecutor() as executor:
-        #     futures = {}
-        #     for file_name, df in stock_data.items():
-        #         futures[executor.submit(self._process_stock_data, file_name, df, output_dir)] = file_name
-
-        #     for future in tqdm(as_completed(futures), desc="Process stock data...", unit="file"):
-        #         file_name = futures[future]
-        #         try:
-        #             cols_new = future.result()
-        #             feature_names.update(cols_new)
-        #         except Exception as e:
-        #             print(f"Error processing {file_name}: {str(e)}")
-
-        # 生成feature dict
-        feature_meta_dic = {}
-        feature_meta_dic['fields'] = []
-        feature_meta_dic['names'] = []
-        feature_meta_dic['description'] = "version: v4.1, code time: 2025-02-01, scope: ta-lib/STR/RSRS, feature count: %d" % len(feature_names)
-        for feature_name in sorted(feature_names):
-            feature_meta_dic['fields'].append(f"${feature_name}")
-            feature_meta_dic['names'].append(feature_name)
-
-        # 输出特征名称到文件
-        if feature_meta_file is None:
-            meta_path = Path(output_dir) / 'feature_names.json'
-        else:
-            meta_path = feature_meta_file
-            
-        ##将dict 输出到json文件中
-        with open(meta_path, 'w') as f:
-            json.dump(feature_meta_dic, f, indent=4)
-
-        for file_name, df in tqdm(non_stock_data.items(), desc="Process non-stock data...", unit="file"):
-            # 仅保存沪深300的数据
-            if self.index_code in file_name:
-                output_path = Path(output_dir) / file_name
-                df.to_csv(output_path)
 
     def _check_file_status(self, input_path: Path, output_path: Path) -> dict:
         """检查文件状态，判断是否需要更新
@@ -841,73 +756,146 @@ class TALibFeatureExt:
                 'needs_update': bool,  # 是否需要更新
                 'last_date': pd.Timestamp,  # 最后更新日期
                 'history_start': pd.Timestamp,  # 需要的历史数据起始日期
+                'history_rsrs_start': pd.Timestamp,  # RSRS因子所需的历史数据起始日期
                 'input_df': pd.DataFrame,  # 输入数据
                 'existing_df': pd.DataFrame,  # 已存在的数据
             }
         """
-        max_history_window = max(48, self.time_range)  # EMA=48, STR=time_range
-        
         # 读取输入文件
         input_df = pd.read_csv(input_path, index_col=0, parse_dates=True)
-        
+        df_start_date = input_df.index.min()
+        df_length = len(input_df)
+
         if not output_path.exists():
+            rsrs_input_df = input_df.copy()
             return {
                 'needs_update': True,
                 'last_date': None,
-                'history_start': None,
+                'df_length':df_length,
                 'input_df': input_df,
-                'existing_df': None
+                'input_rsrs_df': rsrs_input_df
             }
-            
+
         # 读取已存在的输出文件
         existing_df = pd.read_csv(output_path, index_col=0, parse_dates=True)
         last_date = existing_df.index.max()
-        
+
         # 检查是否需要更新
         needs_update = input_df.index.max() > last_date
-        
+
         if needs_update:
-            history_start = last_date - pd.Timedelta(days=max_history_window)
+            pos = input_df.index.get_loc(last_date)
+            start_idx = max(0, pos - self.window_size_global)
+            history_start = input_df.index[start_idx]
+            df_global_cast = input_df[input_df.index >= history_start].copy() ## 截断dataframe
+            
+            pos_rsrs = input_df.index.get_loc(last_date)
+            start_idx_rsrs = max(0, pos_rsrs - self.window_size_rsrs)
+            history_rsrs_start = input_df.index[start_idx_rsrs]
+            df_rsrs_cast = input_df.loc[history_rsrs_start:, ['high', 'low']].copy()  ## 截断dataframe
         else:
             history_start = None
-            
+            history_rsrs_start = None
+            df_global_cast = None
+            df_rsrs_cast = None
+
         return {
             'needs_update': needs_update,
             'last_date': last_date,
-            'history_start': history_start,
-            'input_df': input_df,
-            'existing_df': existing_df
+            'df_length':df_length,
+            'input_df': df_global_cast,
+            'input_rsrs_df': df_rsrs_cast            
         }
 
-    def _process_stock_data_incremental(self, file_name: str, df: pd.DataFrame, 
+    def _process_stock_data_incremental(self, file_name: str, df: pd.DataFrame,
+                                        rsrs_df: pd.DataFrame,
                                       output_path: Path, last_date=None):
         """增量处理单个股票数据"""
         try:
             code = file_name.split('.')[0]
             
-            # 生成新特征
-            new_features = self.generate_single_stock_features(df)
-            slice_features = self.generate_slice_features(code)
-            rsrs_features = self.generate_rsrs_features(df)
-            
-            # 合并特征
-            result = pd.concat([df, new_features, slice_features, rsrs_features], axis=1)
-            
-            # 如果是增量更新，合并新旧数据
+            if df.empty or rsrs_df.empty:
+                raise ValueError(f"Empty DataFrame for {code}")
+
             if last_date is not None:
+                # 生成新特征
+                new_features = self.generate_single_stock_features(df)
+                new_features = new_features[new_features.index > last_date]
+                #print(new_features.columns.to_list())
+                #['SIZE', 'EMA_5', 'EMA_10', 'EMA_20', 'SAR', 'KAMA_12', 'KAMA_24', 'KAMA_48', 'TEMA_12', 'TEMA_24', 'TEMA_48', 'TRIMA_12', 'TRIMA_24', 'TRIMA_48', 'ADX_14', 'ADX_28', 'APO', 'AROON_14_down', 'AROON_14_up', 'AROON_28_down', 'AROON_28_up', 'BOP', 'CCI_14', 'CCI_28', 'CMO_14', 'CMO_28', 'MACD', 'MACD_SIGNAL', 'MACD_HIST', 'MOM_6', 'MOM_12', 'MOM_24', 'MOM_48', 'MFI_6', 'MFI_12', 'MFI_24', 'MFI_48', 'ROC_6', 'ROC_12', 'ROC_24', 'ROC_48', 'RSI_6', 'RSI_12', 'RSI_24', 'STOCHF_k', 'STOCHF_d', 'STOCHRSI_k', 'STOCHRSI_d', 'TRIX_12', 'TRIX_24', 'TRIX_48', 'ULTOSC', 'WILLR_6', 'WILLR_12', 'WILLR_24', 'WILLR_48', 'AD', 'ADOSC', 'OBV', 'ATR_14', 'ATR_28', 'NATR_14', 'NATR_28', 'TRANGE', 'LINEARREG_SLOPE_5', 'LINEARREG_SLOPE_14', 'LINEARREG_SLOPE_28', 'TSF_5', 'TSF_10', 'TSF_20', 'TSF_40', 'VAR_5', 'VAR_10', 'VAR_20', 'VAR_40', 'TURN_RATE_LN', 'TURN_MAX_5', 'TURN_MAX_10', 'TURN_MAX_20', 'TURN_MAX_40', 'TURN_MIN_5', 'TURN_MIN_10', 'TURN_MIN_20', 'TURN_MIN_40', 'TURN_RATE_EMA_5', 'TURN_RATE_EMA_10', 'TURN_RATE_EMA_20', 'TURN_ROC_5', 'TURN_ROC_10', 'TURN_ROC_20', 'TURN_ROC_40', 'TURN_SLOPE_5', 'TURN_SLOPE_10', 'TURN_SLOPE_20', 'TURN_SLOPE_40', 'TURN_RSI_5', 'TURN_RSI_10', 'TURN_RSI_20', 'TURN_RSI_40', 'TURN_TSF_5', 'TURN_TSF_10', 'TURN_TSF_20', 'TURN_TSF_40', 'AMOUNT_LN', 'AMT_MAX_5', 'AMT_MAX_10', 'AMT_MAX_20', 'AMT_MAX_40', 'AMT_MIN_5', 'AMT_MIN_10', 'AMT_MIN_20', 'AMT_MIN_40', 'AMT_EMA_5', 'AMT_EMA_10', 'AMT_EMA_20', 'AMT_EMA_40', 'AMT_ROC_5', 'AMT_ROC_10', 'AMT_ROC_20', 'AMT_ROC_40', 'AMT_TRIX_5', 'AMT_TRIX_10', 'AMT_TRIX_20', 'AMT_TRIX_40', 'AMT_SLOPE_5', 'AMT_SLOPE_10', 'AMT_SLOPE_20', 'AMT_SLOPE_40', 'AMT_RSI_5', 'AMT_RSI_10', 'AMT_RSI_20', 'AMT_RSI_40', 'AMT_TSF_5', 'AMT_TSF_10', 'AMT_TSF_20', 'AMT_TSF_40', 'AMT_VAR_5', 'AMT_VAR_10', 'AMT_VAR_20', 'AMT_VAR_40']
+                #print(new_features.info())
+                # <class 'pandas.core.frame.DataFrame'>
+                # DatetimeIndex: 4 entries, 2025-01-27 to 2025-02-07
+                # Columns: 140 entries, SIZE to AMT_VAR_40
+                # dtypes: float64(140)
+                # memory usage: 4.4 KB
+                #print(new_features.tail())
+
+                slice_features = self.generate_slice_features(code)
+                slice_features = slice_features[slice_features.index > last_date]
+                #print(slice_features.info())
+                # <class 'pandas.core.frame.DataFrame'>
+                # DatetimeIndex: 4 entries, 2025-01-27 to 2025-02-07
+                # Data columns (total 3 columns):
+                #  #   Column              Non-Null Count  Dtype  
+                # ---  ------              --------------  -----  
+                #  0   DAILY_AMOUNT_RATIO  4 non-null      float64
+                #  1   STR_FACTOR          4 non-null      object ———强制转化为float64
+                #  2   RANK                4 non-null      float64
+                # dtypes: float64(2), object(1)
+                # memory usage: 128.0+ bytes
+                #print(slice_features.tail())
+
+                rsrs_features = self.generate_rsrs_features(rsrs_df)
+                rsrs_features = rsrs_features[rsrs_features.index > last_date]
+                #print(rsrs_features.info())
+                # <class 'pandas.core.frame.DataFrame'>
+                # DatetimeIndex: 4 entries, 2025-01-27 to 2025-02-07
+                # Data columns (total 4 columns):
+                # #   Column       Non-Null Count  Dtype  
+                # ---  ------       --------------  -----  
+                # 0   base_RSRS    4 non-null      float64
+                # 1   norm_RSRS    4 non-null      float64
+                # 2   revise_RSRS  4 non-null      float64
+                # 3   pos_RSRS     4 non-null      float64
+                # dtypes: float64(4)
+                # memory usage: 160.0 bytes
+                #print(rsrs_features.tail())
+
+                input_df = df[df.index > last_date]
+
+                # 合并特征
+                updated_df = pd.concat([input_df, new_features, slice_features, rsrs_features], axis=1)
+                #print(updated_df.columns.to_list())
+                #print(updated_df.head())
+                #print(updated_df.info())
+                # <class 'pandas.core.frame.DataFrame'>
+                # DatetimeIndex: 4 entries, 2025-01-27 to 2025-02-07
+                # Columns: 170 entries, open to pos_RSRS
+                # dtypes: float64(170)
+                # memory usage: 5.3 KB
+
                 # 读取已有数据
                 existing_df = pd.read_csv(output_path, index_col=0, parse_dates=True)
-                # 保留旧数据中不需要更新的部分
-                old_data = existing_df[existing_df.index <= last_date]
-                # 从新计算的结果中只保留需要更新的部分
-                new_data = result[result.index > last_date]
-                # 合并新旧数据
-                result = pd.concat([old_data, new_data])
+                #print(existing_df.info())
+
+                # 合并新旧数据并按索引排序
+                result = pd.concat([existing_df, updated_df[~updated_df.index.isin(existing_df.index)]], axis=0)
+                # 保存结果
+                result.to_csv(output_path)
+                return result.columns.tolist()
+
+            else:
+                new_features = self.generate_single_stock_features(df)
+                slice_features = self.generate_slice_features(code)
+                rsrs_features = self.generate_rsrs_features(rsrs_df)
+                input_df = df
                 
-            # 保存结果
-            result.to_csv(output_path)
-            return result.columns.tolist()
-            
+                # 合并特征
+                updated_df = pd.concat([input_df, new_features, slice_features, rsrs_features], axis=1)
+                # 保存结果
+                updated_df.to_csv(output_path)
+                return updated_df.columns.tolist()
         except Exception as e:
             print(f"Error processing {file_name}: {e}")
             return []
@@ -918,75 +906,132 @@ class TALibFeatureExt:
 
         print("Scanning files...")
         stock_data = {}
+        stock_data_rsrs = {}
         update_files = []
         effective_count = 0
         empty_count = 0
         short_count = 0
+        feature_names = set()
 
         # 1. 扫描文件并检查更新状态
         for file_path in Path(input_dir).glob('*.csv'):
             filename = file_path.name
             output_path = Path(output_dir) / filename
+            stock_id = filename.rsplit('.', 1)[0]
 
             if any(code in filename for code in self.stock_codes_set):
                 try:
+                    ### 如果stock id不在stock_pool中，则跳过
+                    if self.stock_pool is not None and stock_id not in self.stock_pool:
+                        continue
+                    
                     status = self._check_file_status(file_path, output_path)
+                    # {
+                    #     'needs_update': needs_update,
+                    #     'last_date': last_date,
+                    #     'df_length':df_length,
+                    #     'input_df': df_global_cast,
+                    #     'input_rsrs_df': df_rsrs_cast            
+                    # }
 
                     if status['input_df'].empty:
                         empty_count += 1
                         continue
 
-                    if len(status['input_df']) < self.minimum_data_length:
+                    # 如果数据长度不足，则跳过
+                    if status['df_length'] < self.minimum_data_length:
                         short_count += 1
                         continue
 
                     if status['needs_update']:
+
                         stock_data[filename] = status['input_df']
+                        stock_data_rsrs[filename] = status['input_rsrs_df']
+                        last_date = status['last_date']
                         update_files.append({
                             'filename': filename,
-                            'status': status,
+                            'last_date': last_date,
                             'output_path': output_path
                         })
                         effective_count += 1
 
                 except Exception as e:
                     print(f"Error checking {filename}: {e}")
-                    
+
+            if self.index_code in filename: # 如果是指数
+                print(f"Reading index file: {file_path.name}")
+                df = pd.read_csv(file_path, parse_dates=['date'])
+
+                # 提取需要的列
+                self.index_df = df[['date', 'pctChg']]
+                self.index_df.set_index('date', inplace=True)
         print(f"Found {len(update_files)} files to update")
-        
+
         if not update_files:
             print("No files need to be updated.")
             return
-            
+
         # 2. 计算横截面特征
         print("Calculating cross-sectional features...")
         self.pre_process_slice_features(stock_data)
-        
+
         # 3. 并行处理需要更新的文件
         print("Processing updates...")
         results = Parallel(n_jobs=-1)(
             delayed(self._process_stock_data_incremental)(
                 file_info['filename'],
                 stock_data[file_info['filename']],
+                stock_data_rsrs[file_info['filename']],
                 file_info['output_path'],
-                file_info['status']['last_date']
+                file_info['last_date']
             )
             for file_info in tqdm(update_files, desc="Updating files")
         )
-        
+
+        # 4. 更新特征名称
+        for cols_new in results:
+            feature_names.update(cols_new)
+        self.output_feature_meta(file_path = feature_meta_file, feature_name_set=feature_names)
+
         print(f"Successfully processed {len(results)} files")
+
+        # 5. 保存指数数据
+        if not self.index_df.empty:
+            output_path = Path(output_dir) / f"{self.index_code}.csv"
+            self.index_df.to_csv(output_path)
+
+    def output_feature_meta(self, file_path: str, feature_name_set: set):
+        """_summary_
+
+        Args:
+            file_path (str): _description_
+            feature_name_set (set): _description_
+        """
+        # 生成feature dict
+        feature_meta_dic = {}
+        feature_meta_dic['fields'] = []
+        feature_meta_dic['names'] = []
+        feature_meta_dic['description'] = "version: v4.2, code time: 2025-02-012, scope: ta-lib/STR/RSRS, feature count: %d" % len(feature_name_set)
+
+        for feature_name in sorted(feature_name_set):
+            feature_meta_dic['fields'].append(f"${feature_name}")
+            feature_meta_dic['names'].append(feature_name)
+
+        ##将dict 输出到json文件中
+        with open(file_path, 'w') as f:
+            json.dump(feature_meta_dic, f, indent=4)
 
 def __test__():
     basic_info_path = '/home/godlike/project/GoldSparrow/Day_Data/qlib_data/basic_info.csv'
     in_folder = '/home/godlike/project/GoldSparrow/Day_Data/test_raw'
     out_folder = '/home/godlike/project/GoldSparrow/Day_Data/test_raw_ta'
     feature_meta_file = '/home/godlike/project/GoldSparrow/Day_Data/feature_names.json'
-    stock_pool_file = '/home/godlike/project/GoldSparrow/Day_Data/qlib_data/instruments/csi300.txt'
+    #stock_pool_file = '/home/godlike/project/GoldSparrow/Day_Data/qlib_data/instruments/csi300.txt'
 
     feature_generator = TALibFeatureExt(
         basic_info_path=basic_info_path,
         time_range=30,
-        stock_pool_path=stock_pool_file
+        stock_pool_path=None
     )
     # 使用增量更新方法
     feature_generator.process_directory_incremental(in_folder, out_folder, feature_meta_file)

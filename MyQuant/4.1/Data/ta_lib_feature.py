@@ -844,9 +844,9 @@ def __test__():
     ##本地地址
     basic_info_path = '/home/godlike/project/GoldSparrow/Day_Data/qlib_data/basic_info.csv'
     in_folder = '/home/godlike/project/GoldSparrow/Day_Data/test_raw'
-    out_folder = '/home/godlike/project/GoldSparrow/Day_data/test_raw_ta'
-    feature_meta_file = '/home/godlike/project/GoldSparrow/Day_data/feature_names.json'
-    stock_pool_file = '/home/godlike/project/GoldSparrow/Day_data/qlib_data/instruments/csi300.txt'
+    out_folder = '/home/godlike/project/GoldSparrow/Day_Data/test_raw_ta'
+    feature_meta_file = '/home/godlike/project/GoldSparrow/Day_Data/feature_names.json'
+    stock_pool_file = '/home/godlike/project/GoldSparrow/Day_Data/qlib_data/instruments/csi300.txt'
 
     feature_generator = TALibFeatureExt(basic_info_path=basic_info_path,time_range = 5,stock_pool_path=stock_pool_file)
     feature_generator.process_directory(in_folder, out_folder,feature_meta_file)
