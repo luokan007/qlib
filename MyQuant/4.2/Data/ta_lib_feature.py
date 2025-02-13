@@ -276,7 +276,9 @@ class TALibFeatureExt:
             pd.DataFrame: 每天的STR因子数据框，其中索引是日期，列为不同的股票代码。
         """
         ## 检查pivot_return_df每一行的数据，如果空值大于5条，则drop掉该行，并打印drop掉的行的索引
-        pivot_return_df = pivot_return_df.dropna(thresh=pivot_return_df.shape[1] - 5)
+        before_drop = len(pivot_return_df)
+        pivot_return_df = pivot_return_df.dropna(thresh=5)
+        print("drop NA line for STR computing:", before_drop - len(pivot_return_df))
 
         time_range = self.time_range
         # 创建一个空的DataFrame来存储每天的STR因子
@@ -284,7 +286,7 @@ class TALibFeatureExt:
 
         sigma = self._calc_str_sigma(pivot_return_df)
         
-        def _calculate_str_factor_for_date(cur_date, sigma,  return_df):
+        def _calculate_str_factor_for_date(cur_date, sigma, return_df):
             # 为每一天计算weight
 
             weight = self._calc_str_weight(sigma=sigma, cur_date=cur_date)

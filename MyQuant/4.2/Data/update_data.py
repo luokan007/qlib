@@ -7,6 +7,12 @@
 #   - 支持自定义时间区间，默认为最近一年
 #   - 扩展当前的feature范围
 
+import sys
+sys.path.append('/home/godlike/project/qlib/qlib/MyQuant')
+import warnings
+warnings.filterwarnings("ignore")
+from MyUtil.mydump_bin import DumpDataAll
+
 import os
 import shutil
 import datetime
@@ -23,9 +29,7 @@ import akshare as ak
 
 # from qlib_dump_bin import DumpDataAll
 from ta_lib_feature import TALibFeatureExt
-from MyQuant.MyUtil.mydump_bin import DumpDataAll
-import warnings
-warnings.filterwarnings("ignore")
+
 
 def _read_all_text(path: str) -> str:
     with open(path, "r") as f:
@@ -709,7 +713,7 @@ if __name__ == "__main__":
     # _basic_info_path='/root/autodl-tmp/GoldSparrow/Day_data/qlib_data/basic_info.csv'
 
     ##本地环境
-    work_folder = "/home/godlike/project/GoldSparrow/Day_data"
+    work_folder = "/home/godlike/project/GoldSparrow/Day_Data"
 
     _csv_path= f"{work_folder}/Raw"
     _feature_path=f"{work_folder}/Merged_talib"
