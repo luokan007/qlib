@@ -197,12 +197,12 @@ class QuantModel:
 
 # 示例配置字典 - LSTM
 config_lstm = {
-    # 'provider_uri': "/root/autodl-tmp/GoldSparrow/Day_data/qlib_data",
-    # 'output_dir': "/root/autodl-tmp/GoldSparrow/Temp_Data",
-    # 'feature_meta_file': '/root/autodl-tmp/GoldSparrow/Day_data/qlib_data/feature_meta.json',
-    'provider_uri': "/home/godlike/project/GoldSparrow/Day_Data/qlib_data",
-    'output_dir': "/home/godlike/project/GoldSparrow/Temp_Data",
-    'feature_meta_file': '/home/godlike/project/GoldSparrow/Day_Data/feature_names.json',
+    'provider_uri': "/root/autodl-tmp/GoldSparrow/Day_Data/qlib_data",
+    'output_dir': "/root/autodl-tmp/GoldSparrow/Temp_Data",
+    'feature_meta_file': '/root/autodl-tmp/GoldSparrow/Day_Data/qlib_data/feature_meta.json',
+    # 'provider_uri': "/home/godlike/project/GoldSparrow/Day_Data/qlib_data",
+    # 'output_dir': "/home/godlike/project/GoldSparrow/Temp_Data",
+    # 'feature_meta_file': '/home/godlike/project/GoldSparrow/Day_Data/feature_names.json',
     'pool': 'csi300',
     'train': ('2008-01-01', '2020-12-31'),
     'valid': ('2021-01-01', '2022-12-31'),
@@ -224,16 +224,16 @@ config_lstm = {
 
 # 示例配置字典 - ALSTM
 config_alstm = {
-     # 'provider_uri': "/root/autodl-tmp/GoldSparrow/Day_data/qlib_data",
-    # 'output_dir': "/root/autodl-tmp/GoldSparrow/Temp_Data",
-    # 'feature_meta_file': '/root/autodl-tmp/GoldSparrow/Day_data/qlib_data/feature_meta.json',
-    'provider_uri': "/home/godlike/project/GoldSparrow/Day_Data/qlib_data",
-    'output_dir': "/home/godlike/project/GoldSparrow/Temp_Data",
-    'feature_meta_file': '/home/godlike/project/GoldSparrow/Day_Data/feature_names.json',
+     'provider_uri': "/root/autodl-tmp/GoldSparrow/Day_Data/qlib_data",
+    'output_dir': "/root/autodl-tmp/GoldSparrow/Temp_Data",
+    'feature_meta_file': '/root/autodl-tmp/GoldSparrow/Day_Data/qlib_data/feature_meta.json',
+    # 'provider_uri': "/home/godlike/project/GoldSparrow/Day_Data/qlib_data",
+    # 'output_dir': "/home/godlike/project/GoldSparrow/Temp_Data",
+    # 'feature_meta_file': '/home/godlike/project/GoldSparrow/Day_Data/feature_names.json',
     'pool': 'csi300',
     'train': ('2008-01-01', '2020-12-31'),
     'valid': ('2021-01-01', '2022-12-31'),
-    'test': ('2023-01-01', '2025-02-08'),
+    'test': ('2023-01-01', '2025-02-13'),
     'model_type': 'alstm',
     'model_step_len': 20,
     'model_params': {
@@ -247,7 +247,7 @@ config_alstm = {
         'batch_size': 800,
         'metric': "loss",
         'loss': "mse",
-        'n_jobs': 8,
+        'n_jobs': 32,
         'GPU': 0,
         'rnn_type': "GRU"
     }
