@@ -8,7 +8,7 @@
 #   - 扩展当前的feature范围
 
 import sys
-sys.path.append('/home/godlike/project/qlib/qlib/MyQuant')
+sys.path.append('/home/GoldSparrow/qlib/MyQuant')
 import warnings
 warnings.filterwarnings("ignore")
 from MyUtil.mydump_bin import DumpDataAll
@@ -713,7 +713,8 @@ if __name__ == "__main__":
     # _basic_info_path='/root/autodl-tmp/GoldSparrow/Day_data/qlib_data/basic_info.csv'
 
     ##本地环境
-    work_folder = "/home/godlike/project/GoldSparrow/Day_Data"
+    #work_folder = "/home/godlike/project/GoldSparrow/Day_Data"
+    work_folder = "/root/autodl-tmp/GoldSparrow/Day_Data"
 
     _csv_path= f"{work_folder}/Raw"
     _feature_path=f"{work_folder}/Merged_talib"
@@ -734,7 +735,7 @@ if __name__ == "__main__":
         #  BaoStock提供的是涨跌幅复权算法复权因子，具体介绍见：BaoStock复权因子简介。
         adjustflag="1",
         overwrite=True,  # 是否覆盖已存在的股票行情csv文件
-        max_workers=8,  ##8 core cpu, 云主机为32核
+        max_workers=32,  ##8 core cpu, 云主机为32核
     )
 
     useCache = True  # 使用缓存股票基本信息，和调整因子。入股股票代码中的代码在缓存基本信息中不存在，则不会下载其行情数据

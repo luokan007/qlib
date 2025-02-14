@@ -1,11 +1,19 @@
 from pathlib import Path
+from datetime import datetime
 
-def process_files(input_dir, output_dir):
+def process_files(input_dir, output_dir, threshold_date):
     input_dir = Path(input_dir).resolve()
     output_dir = Path(output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # 如果输入和输出目录相同，先获取所有待处理文件的列表
+    # 转换传入的阈值日期字符串为 datetime 对象
+    try:
+        date_threshold = datetime.strptime(threshold_date, '%Y-%m-%d')
+    except Exception as e:
+        print(f"Error parsing threshold_date {threshold_date}: {e}")
+        return
+
+    # 获取所有待处理文件的列表
     files = [f for f in input_dir.iterdir() if f.is_file()]
 
     for file_path in files:
@@ -13,19 +21,31 @@ def process_files(input_dir, output_dir):
             lines = f.readlines()
 
         original_line_count = len(lines)
-        # 如果行数大于 10，则删除最后 10 行
-        if original_line_count > 10:
-            lines = lines[:-10]
+        filtered_lines = []
 
-        # 如果输入和输出目录相同，则直接覆盖原文件
+        for line in lines:
+            parts = line.split(',')
+            if parts:
+                try:
+                    # 假设日期在第一列，格式为 YYYY-MM-DD
+                    line_date = datetime.strptime(parts[0], '%Y-%m-%d')
+                    # 只有日期小于或等于阈值的才保留
+                    if line_date <= date_threshold:
+                        filtered_lines.append(line)
+                except Exception:
+                    # 无法解析日期则保留该行
+                    filtered_lines.append(line)
+            else:
+                filtered_lines.append(line)
+
         output_file = output_dir / file_path.name
         with output_file.open('w', encoding='utf-8') as f:
-            f.writelines(lines)
+            f.writelines(filtered_lines)
         
-        print(f"Processed {file_path.name}: {original_line_count} -> {len(lines)} lines")
+        print(f"Processed {file_path.name}: {original_line_count} -> {len(filtered_lines)} lines")
 
 if __name__ == '__main__':
-
-    input_directory = "/home/godlike/project/GoldSparrow/Day_Data/test_raw_ta"
-    output_directory = "/home/godlike/project/GoldSparrow/Day_Data/test_raw_ta"
-    process_files(input_directory, output_directory)
+    input_directory = "/root/autodl-tmp/GoldSparrow/Day_Data/test_raw_ta"
+    output_directory = "/root/autodl-tmp/GoldSparrow/Day_Data/test_raw_ta"
+    threshold = "2024-12-30"  # 设置阈值日期，格式为 YYYY-MM-DD
+    process_files(input_directory, output_directory, threshold)
