@@ -936,16 +936,15 @@ class TALibFeatureExt:
                     #     'input_rsrs_df': df_rsrs_cast            
                     # }
 
-                    if status['input_df'].empty:
-                        empty_count += 1
-                        continue
-
-                    # 如果数据长度不足，则跳过
-                    if status['df_length'] < self.minimum_data_length:
-                        short_count += 1
-                        continue
-
                     if status['needs_update']:
+                        if status['input_df'].empty:
+                            empty_count += 1
+                            continue
+
+                        # 如果数据长度不足，则跳过
+                        if status['df_length'] < self.minimum_data_length:
+                            short_count += 1
+                            continue
 
                         stock_data[filename] = status['input_df']
                         stock_data_rsrs[filename] = status['input_rsrs_df']
@@ -1024,15 +1023,18 @@ class TALibFeatureExt:
             json.dump(feature_meta_dic, f, indent=4)
 
 def __test__():
-    basic_info_path = '/home/godlike/project/GoldSparrow/Day_Data/qlib_data/basic_info.csv'
-    in_folder = '/home/godlike/project/GoldSparrow/Day_Data/test_raw'
-    out_folder = '/home/godlike/project/GoldSparrow/Day_Data/test_raw_ta'
-    feature_meta_file = '/home/godlike/project/GoldSparrow/Day_Data/feature_names.json'
-    #stock_pool_file = '/home/godlike/project/GoldSparrow/Day_Data/qlib_data/instruments/csi300.txt'
+    #working_folder = '/home/godlike/project/GoldSparrow/Day_Data' ## 本地测试
+    working_folder = '/root/autodl-tmp/GoldSparrow/Day_Data' ## 服务器测试
+
+    basic_info_path = f"{working_folder}/qlib_data/basic_info.csv"
+    in_folder = f"{working_folder}/test_raw"
+    out_folder = f"{working_folder}/test_raw_ta"
+    feature_meta_file = f"{working_folder}/feature_names.json"
+    stock_pool_file = f"{working_folder}/qlib_data/instruments/csi300.txt"
 
     feature_generator = TALibFeatureExt(
         basic_info_path=basic_info_path,
-        time_range=30,
+        time_range=5,
         stock_pool_path=None
     )
     # 使用增量更新方法
