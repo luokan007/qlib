@@ -11,13 +11,14 @@ import talib
 from joblib import Parallel, delayed
 from tqdm import tqdm  
 from rsrs_feature import RSRSFeature
+from cpv_feature import CPVFeature
 
 
 
 class TALibFeatureExt:
     """_summary_
     """
-    def __init__(self, basic_info_path,time_range = 30, stock_pool_path = None):
+    def __init__(self, basic_info_path, time_range=30, stock_pool_path=None, cpv_feature_config_path=None, n_jobs=-1):
         """初始化特征生成器"""
         # 定义要生成的技术指标及其参数
         self.window_size_global = max(time_range, 60) ###time_range是STR因子所需的时间窗口，48是EMA等ta-lib因子所需的时间窗口,取60是一个更加安全的边界
@@ -25,6 +26,17 @@ class TALibFeatureExt:
         
         self.time_range = time_range
         
+        self.cpv_feature_config_path = cpv_feature_config_path
+        if self.cpv_feature_config_path is not None:
+            print( f"Using CPV feature, configure file: {self.cpv_feature_config_path}")
+            self.cpv_feature_cls = CPVFeature(self.cpv_feature_config_path)
+            self.cpv_df = self.cpv_feature_cls.online_process()
+        else:
+            self.cpv_feature_cls = None
+            self.cpv_df = None
+        
+        self.n_jobs = n_jobs
+
         self.feature_functions = {
             'EMA': {'timeperiod': [5, 10, 20]},
             'SAR': {},
@@ -96,7 +108,7 @@ class TALibFeatureExt:
         self.rank_df = pd.DataFrame()
         self.effective_stock_count_df = pd.DataFrame()
         self.index_code = "sh000300"
-        self.index_df = pd.DataFrame(columns=['date', 'pctChg'])
+        self.index_df = pd.DataFrame()
 
         self.basic_info_df = pd.read_csv(basic_info_path)
 
@@ -124,9 +136,8 @@ class TALibFeatureExt:
         """创建包含日期、代码、涨跌幅和成交量的数据框"""
         print("Creating stock slice DataFrame...")
         dataframes = []
-        for file_name, df in stock_data.items():
+        for code, df in stock_data.items():
             if not df.empty:
-                code = file_name.split('.')[0]
                 df_reset = df.reset_index()
                 df_reset['code'] = code
                 dataframes.append(df_reset[['date', 'code', 'pctChg', 'amount']])
@@ -265,7 +276,7 @@ class TALibFeatureExt:
         #         sz002094    0.713251
         return ret_df.loc[cur_date]
 
-    def calculate_daily_str_factors(self, pivot_return_df: pd.DataFrame, n_jobs=-1):
+    def calculate_daily_str_factors(self, pivot_return_df: pd.DataFrame):
         """
         计算每一天的STR因子。
         
@@ -302,7 +313,7 @@ class TALibFeatureExt:
         #     results.append(result)
         
         # 使用joblib进行并行计算
-        results = Parallel(n_jobs=n_jobs)(
+        results = Parallel(n_jobs=self.n_jobs)(
             delayed(_calculate_str_factor_for_date)(date, sigma, pivot_return_df)
             for date in tqdm(dates_to_process, desc='Calculating STR factors')
         )
@@ -631,13 +642,6 @@ class TALibFeatureExt:
         for period in self.feature_functions['VAR']['timeperiod']:
             features[f'VAR_{period}'] = talib.VAR(df[open_col], timeperiod=period)
         
-        # ## beta 指标,
-        # comm_dates = df.index
-        # aligned_index_df = self.index_df.loc[comm_dates]
-        # aligned_index_df.fillna(0, inplace=True)
-        # features['BETA'] = talib.BETA(df[pct_chg_col], aligned_index_df[pct_chg_col], timeperiod=40)
-    
-        
         ## Amount，成交量相关指标
         
         turn_rate_df = pd.DataFrame()
@@ -738,7 +742,6 @@ class TALibFeatureExt:
         Returns:
             _type_: _description_
         """
-        features = {}
         # 确保数据列名符合预期
         assert 'high' in df.columns
         assert 'low' in df.columns
@@ -809,12 +812,13 @@ class TALibFeatureExt:
             'input_rsrs_df': df_rsrs_cast            
         }
 
-    def _process_stock_data_incremental(self, file_name: str, df: pd.DataFrame,
+    def _process_stock_data_incremental(self, stock_id: str, df: pd.DataFrame,
                                         rsrs_df: pd.DataFrame,
+                                        cpv_df: pd.DataFrame,
                                       output_path: Path, last_date=None):
         """增量处理单个股票数据"""
         try:
-            code = file_name.split('.')[0]
+            code = stock_id
             
             if df.empty or rsrs_df.empty:
                 raise ValueError(f"Empty DataFrame for {code}")
@@ -822,7 +826,7 @@ class TALibFeatureExt:
             if last_date is not None:
                 # 生成新特征
                 new_features = self.generate_single_stock_features(df)
-                new_features = new_features[new_features.index > last_date]
+                #new_features = new_features[new_features.index > last_date]  一次性对齐，不需要截断
                 #print(new_features.columns.to_list())
                 #['SIZE', 'EMA_5', 'EMA_10', 'EMA_20', 'SAR', 'KAMA_12', 'KAMA_24', 'KAMA_48', 'TEMA_12', 'TEMA_24', 'TEMA_48', 'TRIMA_12', 'TRIMA_24', 'TRIMA_48', 'ADX_14', 'ADX_28', 'APO', 'AROON_14_down', 'AROON_14_up', 'AROON_28_down', 'AROON_28_up', 'BOP', 'CCI_14', 'CCI_28', 'CMO_14', 'CMO_28', 'MACD', 'MACD_SIGNAL', 'MACD_HIST', 'MOM_6', 'MOM_12', 'MOM_24', 'MOM_48', 'MFI_6', 'MFI_12', 'MFI_24', 'MFI_48', 'ROC_6', 'ROC_12', 'ROC_24', 'ROC_48', 'RSI_6', 'RSI_12', 'RSI_24', 'STOCHF_k', 'STOCHF_d', 'STOCHRSI_k', 'STOCHRSI_d', 'TRIX_12', 'TRIX_24', 'TRIX_48', 'ULTOSC', 'WILLR_6', 'WILLR_12', 'WILLR_24', 'WILLR_48', 'AD', 'ADOSC', 'OBV', 'ATR_14', 'ATR_28', 'NATR_14', 'NATR_28', 'TRANGE', 'LINEARREG_SLOPE_5', 'LINEARREG_SLOPE_14', 'LINEARREG_SLOPE_28', 'TSF_5', 'TSF_10', 'TSF_20', 'TSF_40', 'VAR_5', 'VAR_10', 'VAR_20', 'VAR_40', 'TURN_RATE_LN', 'TURN_MAX_5', 'TURN_MAX_10', 'TURN_MAX_20', 'TURN_MAX_40', 'TURN_MIN_5', 'TURN_MIN_10', 'TURN_MIN_20', 'TURN_MIN_40', 'TURN_RATE_EMA_5', 'TURN_RATE_EMA_10', 'TURN_RATE_EMA_20', 'TURN_ROC_5', 'TURN_ROC_10', 'TURN_ROC_20', 'TURN_ROC_40', 'TURN_SLOPE_5', 'TURN_SLOPE_10', 'TURN_SLOPE_20', 'TURN_SLOPE_40', 'TURN_RSI_5', 'TURN_RSI_10', 'TURN_RSI_20', 'TURN_RSI_40', 'TURN_TSF_5', 'TURN_TSF_10', 'TURN_TSF_20', 'TURN_TSF_40', 'AMOUNT_LN', 'AMT_MAX_5', 'AMT_MAX_10', 'AMT_MAX_20', 'AMT_MAX_40', 'AMT_MIN_5', 'AMT_MIN_10', 'AMT_MIN_20', 'AMT_MIN_40', 'AMT_EMA_5', 'AMT_EMA_10', 'AMT_EMA_20', 'AMT_EMA_40', 'AMT_ROC_5', 'AMT_ROC_10', 'AMT_ROC_20', 'AMT_ROC_40', 'AMT_TRIX_5', 'AMT_TRIX_10', 'AMT_TRIX_20', 'AMT_TRIX_40', 'AMT_SLOPE_5', 'AMT_SLOPE_10', 'AMT_SLOPE_20', 'AMT_SLOPE_40', 'AMT_RSI_5', 'AMT_RSI_10', 'AMT_RSI_20', 'AMT_RSI_40', 'AMT_TSF_5', 'AMT_TSF_10', 'AMT_TSF_20', 'AMT_TSF_40', 'AMT_VAR_5', 'AMT_VAR_10', 'AMT_VAR_20', 'AMT_VAR_40']
                 #print(new_features.info())
@@ -834,7 +838,7 @@ class TALibFeatureExt:
                 #print(new_features.tail())
 
                 slice_features = self.generate_slice_features(code)
-                slice_features = slice_features[slice_features.index > last_date]
+                #slice_features = slice_features[slice_features.index > last_date]
                 #print(slice_features.info())
                 # <class 'pandas.core.frame.DataFrame'>
                 # DatetimeIndex: 4 entries, 2025-01-27 to 2025-02-07
@@ -849,7 +853,7 @@ class TALibFeatureExt:
                 #print(slice_features.tail())
 
                 rsrs_features = self.generate_rsrs_features(rsrs_df)
-                rsrs_features = rsrs_features[rsrs_features.index > last_date]
+                #rsrs_features = rsrs_features[rsrs_features.index > last_date]
                 #print(rsrs_features.info())
                 # <class 'pandas.core.frame.DataFrame'>
                 # DatetimeIndex: 4 entries, 2025-01-27 to 2025-02-07
@@ -865,9 +869,13 @@ class TALibFeatureExt:
                 #print(rsrs_features.tail())
 
                 input_df = df[df.index > last_date]
+                
+                if cpv_df is not None:
+                    cpv_df = cpv_df[cpv_df.index > last_date]
+                    new_features = pd.concat([rsrs_features, cpv_df], axis=1, join="left")
 
-                # 合并特征
-                updated_df = pd.concat([input_df, new_features, slice_features, rsrs_features], axis=1)
+                # 拼接数据
+                updated_df = pd.concat([input_df, new_features_aligned, slice_features_aligned, rsrs_features_aligned], axis=1, join="left")
                 #print(updated_df.columns.to_list())
                 #print(updated_df.head())
                 #print(updated_df.info())
@@ -893,13 +901,24 @@ class TALibFeatureExt:
                 rsrs_features = self.generate_rsrs_features(rsrs_df)
                 input_df = df
                 
+                if cpv_df is not None:
+                    cpv_df = cpv_df[cpv_df.index > last_date]
+                    new_features = pd.concat([rsrs_features, cpv_df], axis=1, join="left")
+
                 # 合并特征
-                updated_df = pd.concat([input_df, new_features, slice_features, rsrs_features], axis=1)
+                # 手动对齐索引
+                new_features_aligned = new_features.reindex(input_df.index)
+                slice_features_aligned = slice_features.reindex(input_df.index)
+                rsrs_features_aligned = rsrs_features.reindex(input_df.index)
+
+                # 拼接数据
+                updated_df = pd.concat([input_df, new_features_aligned, slice_features_aligned, rsrs_features_aligned], axis=1)
+                
                 # 保存结果
                 updated_df.to_csv(output_path)
                 return updated_df.columns.tolist()
         except Exception as e:
-            print(f"Error processing {file_name}: {e}")
+            print(f"Error processing {stock_id}: {e}")
             return []
 
     def process_directory_incremental(self, input_dir, output_dir, feature_meta_file=None):
@@ -946,11 +965,11 @@ class TALibFeatureExt:
                             short_count += 1
                             continue
 
-                        stock_data[filename] = status['input_df']
-                        stock_data_rsrs[filename] = status['input_rsrs_df']
+                        stock_data[stock_id] = status['input_df']
+                        stock_data_rsrs[stock_id] = status['input_rsrs_df']
                         last_date = status['last_date']
                         update_files.append({
-                            'filename': filename,
+                            'stock_id': stock_id,
                             'last_date': last_date,
                             'output_path': output_path
                         })
@@ -963,9 +982,8 @@ class TALibFeatureExt:
                 print(f"Reading index file: {file_path.name}")
                 df = pd.read_csv(file_path, parse_dates=['date'])
 
-                # 提取需要的列
-                self.index_df = df[['date', 'pctChg']]
-                self.index_df.set_index('date', inplace=True)
+                # 保存指数的dataframe
+                self.index_df = df
         print(f"Found {len(update_files)} files to update")
 
         if not update_files:
@@ -978,11 +996,12 @@ class TALibFeatureExt:
 
         # 3. 并行处理需要更新的文件
         print("Processing updates...")
-        results = Parallel(n_jobs=-1)(
+        results = Parallel(n_jobs=self.n_jobs)(
             delayed(self._process_stock_data_incremental)(
-                file_info['filename'],
-                stock_data[file_info['filename']],
-                stock_data_rsrs[file_info['filename']],
+                file_info['stock_id'],
+                stock_data[file_info['stock_id']],
+                stock_data_rsrs[file_info['stock_id']],
+                self.cpv_df[file_info['stock_id']] if self.cpv_df is not None else None,
                 file_info['output_path'],
                 file_info['last_date']
             )
@@ -1000,6 +1019,8 @@ class TALibFeatureExt:
         if not self.index_df.empty:
             output_path = Path(output_dir) / f"{self.index_code}.csv"
             self.index_df.to_csv(output_path)
+        else:
+            print("No index data found or index data is empty")
 
     def output_feature_meta(self, file_path: str, feature_name_set: set):
         """_summary_
@@ -1030,12 +1051,15 @@ def __test__():
     in_folder = f"{working_folder}/test_raw"
     out_folder = f"{working_folder}/test_raw_ta"
     feature_meta_file = f"{working_folder}/feature_names.json"
+    cpv_feature_config_path = f"{working_folder}/cpv_feature.json"
     stock_pool_file = f"{working_folder}/qlib_data/instruments/csi300.txt"
 
     feature_generator = TALibFeatureExt(
         basic_info_path=basic_info_path,
         time_range=5,
-        stock_pool_path=None
+        stock_pool_path=None,
+        cpv_feature_config_path=cpv_feature_config_path,
+        n_jobs=32
     )
     # 使用增量更新方法
     feature_generator.process_directory_incremental(in_folder, out_folder, feature_meta_file)

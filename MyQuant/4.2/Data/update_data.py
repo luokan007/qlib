@@ -603,7 +603,8 @@ class EnhancedDataManager:
         """
         ta_feature_generator = TALibFeatureExt(basic_info_path=basic_info_path,
                                                time_range=30,
-                                                stock_pool_path = self._stock_pool_file)
+                                                stock_pool_path = self._stock_pool_file,
+                                                n_jobs=self._max_workers)
 
         ## 新版本支持增量更新，无需删除整个目录树
         # if os.path.exists(output_dir) and os.path.isdir(output_dir):
