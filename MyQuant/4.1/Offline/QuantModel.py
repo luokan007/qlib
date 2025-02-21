@@ -224,30 +224,30 @@ config_lstm = {
 
 # 示例配置字典 - ALSTM
 config_alstm = {
-     'provider_uri': "/root/autodl-tmp/GoldSparrow/Day_Data/qlib_data",
-    'output_dir': "/root/autodl-tmp/GoldSparrow/Temp_Data",
-    'feature_meta_file': '/root/autodl-tmp/GoldSparrow/Day_Data/qlib_data/feature_meta.json',
-    # 'provider_uri': "/home/godlike/project/GoldSparrow/Day_Data/qlib_data",
-    # 'output_dir': "/home/godlike/project/GoldSparrow/Temp_Data",
-    # 'feature_meta_file': '/home/godlike/project/GoldSparrow/Day_Data/feature_names.json',
+    #  'provider_uri': "/root/autodl-tmp/GoldSparrow/Day_Data/qlib_data",
+    # 'output_dir': "/root/autodl-tmp/GoldSparrow/Temp_Data",
+    # 'feature_meta_file': '/root/autodl-tmp/GoldSparrow/Day_Data/qlib_data/feature_meta.json',
+    'provider_uri': "/home/godlike/project/GoldSparrow/Day_Data/qlib_data",
+    'output_dir': "/home/godlike/project/GoldSparrow/Temp_Data",
+    'feature_meta_file': '/home/godlike/project/GoldSparrow/Day_Data/feature_names.json',
     'pool': 'csi300',
-    'train': ('2008-01-01', '2020-12-31'),
-    'valid': ('2021-01-01', '2022-12-31'),
-    'test': ('2023-01-01', '2025-02-13'),
+    'train': ('2008-01-01', '2022-12-31'),
+    'valid': ('2022-01-01', '2022-12-31'),
+    'test': ('2023-01-01', '2025-02-19'),
     'model_type': 'alstm',
     'model_step_len': 20,
     'model_params': {
         'd_feat': 306,
         'hidden_size': 64,
-        'num_layers': 3,
-        'dropout': 0.2,
+        'num_layers': 2,
+        'dropout': 0,
         'n_epochs': 20,
         'lr': 0.00001,
         'early_stop': 10,
         'batch_size': 800,
         'metric': "loss",
         'loss': "mse",
-        'n_jobs': 32,
+        'n_jobs': 8,
         'GPU': 0,
         'rnn_type': "GRU"
     }
@@ -260,35 +260,9 @@ if __name__ == "__main__":
     qlib.init(provider_uri=config_alstm['provider_uri'], region="cn")
     #selected_features = ['RANK', 'VWAP0', 'TRIX_48', 'RESI10', 'DAILY_AMOUNT_RATIO', 'RESI5', 'KUP2', 'HIGH0', 'ULTOSC', 'CORD30', 'QTLD5', 'WILLR_6', 'STD60', 'STD20', 'TSF_5', 'CORD5', 'RSQR5', 'STOCHF_k', 'STOCHRSI_k', 'KSFT2', 'STD30', 'STD5', 'QTLU5', 'AMT_VAR_40', 'MA5', 'STD10', 'ROC5', 'KLOW2', 'STR_FACTOR', 'CCI_14', 'WVMA5', 'PBMQR', 'KMID', 'OPEN0', 'RESI20', 'CORR30', 'ADX_14', 'MIN60', 'CORD60', 'ROC_6', 'ADX_28', 'KSFT', 'NATR_28', 'KLEN', 'RESI30', 'AMT_VAR_5', 'KMID2', 'CORD20', 'KUP', 'QTLD10', 'QTLU10', 'CORR60', 'RSQR10', 'RSV5', 'ROC_24', 'ADOSC', 'MA20', 'TURN_MAX_20', 'TSF_10', 'BETA5', 'RANK60', 'STOCHRSI_d', 'AMT_TRIX_40', 'BOP', 'BETA30', 'RSI_6', 'BETA20', 'MIN30', 'IMXD60', 'SIZE', 'STOCHF_d', 'ROC10', 'SUMP5', 'CORR20', 'TURN_MAX_40', 'TRIX_12', 'AMT_SLOPE_5', 'OBV', 'MAX60', 'ROC_12', 'CORR5', 'PSTTM', 'TSF_40', 'MIN10', 'AMT_MAX_5', 'RSQR20', 'LOW0', 'TURN_TSF_5', 'VSTD5', 'TURN_SLOPE_5', 'MIN5', 'CORD10', 'CORR10', 'PETTM', 'KLOW', 'BETA60', 'MFI_6', 'AMT_TSF_5', 'AMT_MIN_40', 'TURN_MIN_5', 'AMT_ROC_40', 'ROC30', 'QTLD30', 'AROON_14_down', 'AD', 'AMT_VAR_20', 'MFI_24', 'RSV60', 'BETA10', 'MA10', 'RANK10', 'AMT_MIN_5', 'VSTD20', 'RSQR60', 'MACD_HIST', 'MA30', 'NATR_14', 'RANK30', 'AMT_TRIX_20', 'TURN_MAX_5', 'CCI_28', 'TURN_MAX_10', 'AMT_TSF_20', 'AMT_ROC_5', 'RSQR30', 'MA60', 'RSV10', 'AMT_RSI_40', 'VSUMN5', 'QTLD20', 'VSUMP5', 'WVMA10', 'VMA5', 'TURN_SLOPE_20', 'ROC60', 'AMT_MAX_40', 'RESI60', 'WILLR_12', 'IMXD30', 'SUMP10', 'VAR_5', 'TRANGE', 'TSF_20', 'MAX5', 'MOM_12', 'MOM_6', 'AMOUNT_LN', 'AMT_MIN_20', 'IMIN60', 'QTLD60', 'VMA60', 'WILLR_24', 'LINEARREG_SLOPE_14', 'SUMN5', 'VSTD60', 'RSI_12', 'TURN_MIN_20', 'VAR_10', 'LINEARREG_SLOPE_5', 'AMT_MAX_20', 'AMT_MAX_10', 'MFI_48', 'SUMD5', 'VAR_40', 'QTLU20', 'TURN_SLOPE_10', 'RSV20', 'WILLR_48', 'VSUMP60', 'TRIX_24', 'SUMN10', 'ROC20', 'MAX30', 'AMT_SLOPE_20', 'TURN_RSI_40', 'AMT_EMA_5', 'AMT_SLOPE_40', 'AMT_TSF_40', 'TURN_TSF_20', 'VMA10', 'TURN_MIN_40', 'AMT_TRIX_10', 'QTLU60', 'AMT_EMA_20', 'MIN20', 'CNTD5', 'RSV30', 'ROC_48', 'VSTD30', 'AMT_MIN_10', 'AMT_VAR_10', 'MAX10', 'TURN_RATE_LN', 'VSTD10', 'IMIN5', 'CMO_28', 'AMT_EMA_40', 'IMIN10', 'MFI_12', 'AMT_TRIX_5', 'TURN_RSI_20', 'TURN_RATE_EMA_5', 'TURN_TSF_10', 'TURN_TSF_40', 'AMT_TSF_10', 'AMT_SLOPE_10', 'WVMA30', 'AMT_RSI_10', 'WVMA60', 'IMAX60', 'CNTD60', 'RANK5', 'VSUMN60', 'CNTN5', 'CNTN20', 'AMT_ROC_10', 'TURN_SLOPE_40', 'VMA30', 'TURN_RATE_EMA_20', 'TURN_RSI_5', 'TURNOVER', 'MACD_SIGNAL', 'WVMA20', 'LINEARREG_SLOPE_28', 'CNTD20', 'MAX20', 'AMT_RSI_5', 'AMT_RSI_20', 'RANK20', 'VAR_20', 'CMO_14', 'TURN_ROC_10', 'TURN_MIN_10', 'AMT_EMA_10', 'VSUMP30', 'TURN_RSI_10', 'RSI_24', 'SUMD10', 'VMA20', 'SUMP60', 'AROON_28_down', 'ATR_14', 'SUMN20', 'CNTP5', 'MOM_48', 'APO', 'SUMN30', 'IMIN20', 'SUMP20', 'SUMN60', 'TURN_ROC_5', 'CNTP60', 'VSUMN20', 'AMT_ROC_20', 'VSUMP10', 'TRIMA_48', 'AROON_28_up', 'SUMP30', 'QTLU30', 'IMXD10', 'CNTD30', 'ATR_28', 'MACD', 'IMIN30', 'CNTN60', 'IMXD20', 'TURN_RATE_EMA_10', 'IMAX5', 'CNTD10', 'VSUMD60', 'VSUMP20', 'MOM_24', 'IMAX10', 'SUMD20', 'IMXD5', 'IMAX20', 'CNTN10', 'CNTP20', 'VSUMN10', 'VSUMD5', 'IMAX30', 'VSUMN30', 'CNTP10', 'TURN_ROC_40', 'CNTP30', 'TEMA_12', 'EMA_10', 'SAR', 'KAMA_24', 'TEMA_48', 'SUMD60', 'VSUMD30', 'EMA_5', 'SUMD30', 'AROON_14_up', 'EMA_20', 'KAMA_48', 'VSUMD20', 'TURN_ROC_20', 'CNTN30']
 
-    ## Alpha 158 + turn/pettm/pbmqr/psttm + STR + RSRS
-    # selected_features = ["VWAP0","DAILY_AMOUNT_RATIO","TRIX_48","RESI10","ULTOSC","RESI5","STOCHF_k","QTLD5","KLOW2","STD30",
-    #                     "TURNOVER","CORD30","ADOSC","MIN60","STD20","PBMQR","RSQR5","ADX_14","KUP2","RESI20",
-    #                     "RSQR10","STD60","QTLU5","CORD20","STR_FACTOR","STOCHRSI_k","STOCHF_d","AD","RSV5","CCI_14",
-    #                     "CORR5","WVMA5","WILLR_6","STD10","MA5","RESI30","IMXD60","KSFT","QTLD10","NATR_28",
-    #                     "VSTD5","RANK60","STD5","LOW0","KMID","MA20","VSTD20","RSV60","CORR60","KSFT2",
-    #                     "RESI60","ROC30","HIGH0","ROC5","CORD60","MFI_24","BETA5","CORD5","MIN30","VMA60",
-    #                     "BETA20","VMA5","STOCHRSI_d","OPEN0","ADX_28","WILLR_48","OBV","KMID2","RSV10","CORD10",
-    #                     "CORR10","TRANGE","KLEN","BOP","MFI_6","RSV30","BETA10","ROC_6","RSI_6","SUMD5",
-    #                     "WILLR_12","MACD_HIST","RSI_12","CORR30","CCI_28","IMXD30","KLOW","PSTTM","norm_RSRS","MA60",
-    #                     "MAX5","PETTM","KUP","RSQR30","QTLU10","VMA10","RSQR60","ROC10","ROC_12","MACD_SIGNAL",
-    #                     "MA30","RANK30","RSV20","ROC60","VSTD60","MA10","BETA60","NATR_14","SUMN5","TRIX_24",
-    #                     "WILLR_24","BETA30","RSQR20","MIN20","MAX60","QTLD20","MAX30","pos_RSRS","APO","CORR20",
-    #                     "MIN10","MFI_48","WVMA60","MFI_12","MOM_6","TRIX_12","RANK10","QTLD60","ATR_14","WVMA10",
-    #                     "ROC_24","QTLD30","AROON_14_down","MIN5","VMA20","SUMP5","VSUMP5","CMO_14","VSTD30","CNTN60",
-    #                     "QTLU20","VSTD10","AROON_28_down","MAX20","RANK20","RANK5","MOM_12","RSI_24","CNTN5","ROC20",
-    #                     "IMXD20","IMAX5","MOM_48","AROON_28_up","CMO_28","CNTD10","QTLU60","MAX10","VMA30","VSUMN5",
-    #                     "IMIN60","IMXD5","WVMA20","SUMN10","CNTN30","IMXD10","IMIN10","ROC_48","SUMP10","MOM_24",
-    #                     "IMIN30","TRIMA_12","TRIMA_48","CNTD30","SUMN60","IMAX60","TEMA_24","WVMA30","CNTN10","VSUMP60",
-    #                     "VSUMP20","MACD","VSUMP10","TRIMA_24","TEMA_48","TEMA_12","SUMD10","SUMP60","QTLU30","CNTD20",
-    #                     "SUMP30","KAMA_48","CNTN20","VSUMN10","ATR_28","SAR","KAMA_12","SUMN30","CNTP30","EMA_5",
-    #                     "CNTP5","VSUMP30","SUMP20","IMIN5","IMAX10","CNTP10","VSUMN30","CNTD5","CNTD60","CNTP60",
-    #                     "SUMD30","CNTP20","VSUMN60","IMAX20","VSUMN20","IMAX30","SUMN20","EMA_10","VSUMD5","SUMD60",
-    #                     "IMIN20","VSUMD60","EMA_20","KAMA_24","VSUMD10","VSUMD20", "SUMD20","AROON_14_up","VSUMD30"]
-    
-    ## Alpha 158 + turn/pettm/pbmqr/psttm + STR + RSRS + size
-    selected_features = ["AMT_VAR_5", "AMT_VAR_40",
-                        "VWAP0","DAILY_AMOUNT_RATIO","TRIX_48","RESI10","ULTOSC","RESI5","STOCHF_k","QTLD5","KLOW2","STD30",
-                        "CORD30","ADOSC","MIN60","STD20","PBMQR","RSQR5","ADX_14","KUP2","RESI20",
+    # Alpha 158 + turn/pettm/pbmqr/psttm + STR + RSRS
+    selected_features = ["VWAP0","DAILY_AMOUNT_RATIO","TRIX_48","RESI10","ULTOSC","RESI5","STOCHF_k","QTLD5","KLOW2","STD30",
+                        "TURNOVER","CORD30","ADOSC","MIN60","STD20","PBMQR","RSQR5","ADX_14","KUP2","RESI20",
                         "RSQR10","STD60","QTLU5","CORD20","STR_FACTOR","STOCHRSI_k","STOCHF_d","AD","RSV5","CCI_14",
                         "CORR5","WVMA5","WILLR_6","STD10","MA5","RESI30","IMXD60","KSFT","QTLD10","NATR_28",
                         "VSTD5","RANK60","STD5","LOW0","KMID","MA20","VSTD20","RSV60","CORR60","KSFT2",
@@ -309,7 +283,33 @@ if __name__ == "__main__":
                         "SUMP30","KAMA_48","CNTN20","VSUMN10","ATR_28","SAR","KAMA_12","SUMN30","CNTP30","EMA_5",
                         "CNTP5","VSUMP30","SUMP20","IMIN5","IMAX10","CNTP10","VSUMN30","CNTD5","CNTD60","CNTP60",
                         "SUMD30","CNTP20","VSUMN60","IMAX20","VSUMN20","IMAX30","SUMN20","EMA_10","VSUMD5","SUMD60",
-                        "IMIN20","VSUMD60","EMA_20","KAMA_24","VSUMD10","VSUMD20","SUMD20","AROON_14_up","VSUMD30"]
+                        "IMIN20","VSUMD60","EMA_20","KAMA_24","VSUMD10","VSUMD20", "SUMD20","AROON_14_up","VSUMD30"]
+    
+    ## Alpha 158 + turn/pettm/pbmqr/psttm + STR + RSRS + size
+    # selected_features = ["AMT_VAR_5", "AMT_VAR_40",
+    #                     "VWAP0","DAILY_AMOUNT_RATIO","TRIX_48","RESI10","ULTOSC","RESI5","STOCHF_k","QTLD5","KLOW2","STD30",
+    #                     "CORD30","ADOSC","MIN60","STD20","PBMQR","RSQR5","ADX_14","KUP2","RESI20",
+    #                     "RSQR10","STD60","QTLU5","CORD20","STR_FACTOR","STOCHRSI_k","STOCHF_d","AD","RSV5","CCI_14",
+    #                     "CORR5","WVMA5","WILLR_6","STD10","MA5","RESI30","IMXD60","KSFT","QTLD10","NATR_28",
+    #                     "VSTD5","RANK60","STD5","LOW0","KMID","MA20","VSTD20","RSV60","CORR60","KSFT2",
+    #                     "RESI60","ROC30","HIGH0","ROC5","CORD60","MFI_24","BETA5","CORD5","MIN30","VMA60",
+    #                     "BETA20","VMA5","STOCHRSI_d","OPEN0","ADX_28","WILLR_48","OBV","KMID2","RSV10","CORD10",
+    #                     "CORR10","TRANGE","KLEN","BOP","MFI_6","RSV30","BETA10","ROC_6","RSI_6","SUMD5",
+    #                     "WILLR_12","MACD_HIST","RSI_12","CORR30","CCI_28","IMXD30","KLOW","PSTTM","norm_RSRS","MA60",
+    #                     "MAX5","PETTM","KUP","RSQR30","QTLU10","VMA10","RSQR60","ROC10","ROC_12","MACD_SIGNAL",
+    #                     "MA30","RANK30","RSV20","ROC60","VSTD60","MA10","BETA60","NATR_14","SUMN5","TRIX_24",
+    #                     "WILLR_24","BETA30","RSQR20","MIN20","MAX60","QTLD20","MAX30","pos_RSRS","APO","CORR20",
+    #                     "MIN10","MFI_48","WVMA60","MFI_12","MOM_6","TRIX_12","RANK10","QTLD60","ATR_14","WVMA10",
+    #                     "ROC_24","QTLD30","AROON_14_down","MIN5","VMA20","SUMP5","VSUMP5","CMO_14","VSTD30","CNTN60",
+    #                     "QTLU20","VSTD10","AROON_28_down","MAX20","RANK20","RANK5","MOM_12","RSI_24","CNTN5","ROC20",
+    #                     "IMXD20","IMAX5","MOM_48","AROON_28_up","CMO_28","CNTD10","QTLU60","MAX10","VMA30","VSUMN5",
+    #                     "IMIN60","IMXD5","WVMA20","SUMN10","CNTN30","IMXD10","IMIN10","ROC_48","SUMP10","MOM_24",
+    #                     "IMIN30","TRIMA_12","TRIMA_48","CNTD30","SUMN60","IMAX60","TEMA_24","WVMA30","CNTN10","VSUMP60",
+    #                     "VSUMP20","MACD","VSUMP10","TRIMA_24","TEMA_48","TEMA_12","SUMD10","SUMP60","QTLU30","CNTD20",
+    #                     "SUMP30","KAMA_48","CNTN20","VSUMN10","ATR_28","SAR","KAMA_12","SUMN30","CNTP30","EMA_5",
+    #                     "CNTP5","VSUMP30","SUMP20","IMIN5","IMAX10","CNTP10","VSUMN30","CNTD5","CNTD60","CNTP60",
+    #                     "SUMD30","CNTP20","VSUMN60","IMAX20","VSUMN20","IMAX30","SUMN20","EMA_10","VSUMD5","SUMD60",
+    #                     "IMIN20","VSUMD60","EMA_20","KAMA_24","VSUMD10","VSUMD20","SUMD20","AROON_14_up","VSUMD30"]
 
 
     if len(selected_features) > 0:

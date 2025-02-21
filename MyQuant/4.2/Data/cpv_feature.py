@@ -30,12 +30,10 @@
 #                           - index: date
 #                           - columns: CPV
 #       
-
-import os
 import json
-import pandas as pd
 from pathlib import Path
 from datetime import datetime
+import pandas as pd
 from tqdm import tqdm
 
 class CPVFeature:

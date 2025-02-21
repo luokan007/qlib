@@ -1,4 +1,4 @@
-# title: get_baostock_data
+# title: update_data.py
 # updated: 2024.12.17
 
 
@@ -7,29 +7,28 @@
 #   - 支持自定义时间区间，默认为最近一年
 #   - 扩展当前的feature范围
 
-import sys
-sys.path.append('/home/GoldSparrow/qlib/MyQuant')
-import warnings
-warnings.filterwarnings("ignore")
-from MyUtil.mydump_bin import DumpDataAll
-
 import os
 import shutil
 import datetime
 from pathlib import Path
 from contextlib import redirect_stdout
-from typing import Tuple, List, Dict, Optional
+from typing import Tuple, List, Optional
 from concurrent.futures import ProcessPoolExecutor, as_completed
-
+import sys
 from tqdm import tqdm
 import pandas as pd
+
 import baostock as bs
 from baostock.data.resultset import ResultData
 import akshare as ak
-
 # from qlib_dump_bin import DumpDataAll
 from ta_lib_feature import TALibFeatureExt
+#sys.path.append('/home/GoldSparrow/qlib/MyQuant')
+sys.path.append('/home/godlike/project/qlib/qlib/MyQuant')
+from MyUtil.mydump_bin import DumpDataAll
 
+import warnings
+warnings.filterwarnings("ignore")
 
 def _read_all_text(path: str) -> str:
     with open(path, "r") as f:
@@ -73,6 +72,8 @@ class EnhancedDataManager:
         basic_info_path: str = None,
         feature_meta_file: str = None,
         stock_pool_file: str = None,
+        rsrs_cache_path: str = None,
+        cpv_config_path: str = None,
         adjustflag: str = "1",  # "3": 不复权；"1"：后复权； "2"：前复权。
         start_date: str = None,  # 下载数据开始日期，格式如"2015-01-01" ，None从上市日开始
         end_date: str = None,  # 下载数据的结束日期。None则到最近日
@@ -91,6 +92,8 @@ class EnhancedDataManager:
         self._basic_info_path = os.path.expanduser(basic_info_path)
         self._feature_meta_file = feature_meta_file
         self._stock_pool_file = stock_pool_file
+        self._rsrs_cache_path = os.path.expanduser(rsrs_cache_path)
+        self._cpv_configure_path =os.path.expanduser(cpv_config_path)
         
         self._adjustflag = adjustflag
 
@@ -603,7 +606,9 @@ class EnhancedDataManager:
         """
         ta_feature_generator = TALibFeatureExt(basic_info_path=basic_info_path,
                                                time_range=30,
-                                                stock_pool_path = self._stock_pool_file,
+                                                stock_pool_path=self._stock_pool_file,
+                                                rsrs_cache_path=self._rsrs_cache_path,
+                                                cpv_feature_config_path=self._cpv_configure_path,
                                                 n_jobs=self._max_workers)
 
         ## 新版本支持增量更新，无需删除整个目录树
@@ -668,8 +673,11 @@ class EnhancedDataManager:
         self._add_features(self._csv_path, self._feature_path, self._basic_info_path)
 
         ##删除qlib目录下的calendar和features目录
-        shutil.rmtree(f"{self._qlib_data_path}/calendars")
-        shutil.rmtree(f"{self._qlib_data_path}/features")
+        # 如果目录存在
+        if os.path.exists(f"{self._qlib_data_path}/calendars"):
+            shutil.rmtree(f"{self._qlib_data_path}/calendars")
+        if os.path.exists(f"{self._qlib_data_path}/features"):
+            shutil.rmtree(f"{self._qlib_data_path}/features")
 
         ##保存qlib数据
         self._dump_qlib_data(self._feature_path)
@@ -714,16 +722,19 @@ if __name__ == "__main__":
     # _basic_info_path='/root/autodl-tmp/GoldSparrow/Day_data/qlib_data/basic_info.csv'
 
     ##本地环境
-    #work_folder = "/home/godlike/project/GoldSparrow/Day_Data"
-    work_folder = "/root/autodl-tmp/GoldSparrow/Day_Data"
+    work_folder = "/home/godlike/project/GoldSparrow/Day_Data"
+    #work_folder = "/root/autodl-tmp/GoldSparrow/Day_Data"
 
     _csv_path= f"{work_folder}/Raw"
     _feature_path=f"{work_folder}/Merged_talib"
     _qlib_data_path=f"{work_folder}/qlib_data"
     _basic_info_path=f"{work_folder}/qlib_data/basic_info.csv"
     _feature_meta_file = f"{work_folder}/feature_names.json"
+    _rsrs_cache_file = f"{work_folder}/rsrs_cache.pkl"
     #_stock_pool_file = '/home/godlike/project/GoldSparrow/Day_Data/qlib_data/instruments/csi300.txt'
     _stock_pool_file = None
+    cpv_feature_config_path = "/home/godlike/project/GoldSparrow/Min_Data/config.json"
+
     dm = EnhancedDataManager(   
 
         csv_path=_csv_path,
@@ -732,11 +743,11 @@ if __name__ == "__main__":
         basic_info_path=_basic_info_path,
         feature_meta_file = _feature_meta_file,
         stock_pool_file = _stock_pool_file,
-        #  adjustflag：复权方式，字符串."3": 不复权；"1"：后复权；"2"：前复权。
-        #  BaoStock提供的是涨跌幅复权算法复权因子，具体介绍见：BaoStock复权因子简介。
+        rsrs_cache_path=_rsrs_cache_file,
+        cpv_config_path=cpv_feature_config_path,  # Added the missing argument
         adjustflag="1",
         overwrite=True,  # 是否覆盖已存在的股票行情csv文件
-        max_workers=32,  ##8 core cpu, 云主机为32核
+        max_workers=8,  ##8 core cpu, 云主机为32核
     )
 
     useCache = True  # 使用缓存股票基本信息，和调整因子。入股股票代码中的代码在缓存基本信息中不存在，则不会下载其行情数据

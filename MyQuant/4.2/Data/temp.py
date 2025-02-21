@@ -45,7 +45,7 @@ def process_files(input_dir, output_dir, threshold_date):
         print(f"Processed {file_path.name}: {original_line_count} -> {len(filtered_lines)} lines")
 
 if __name__ == '__main__':
-    input_directory = "/root/autodl-tmp/GoldSparrow/Day_Data/test_raw_ta"
-    output_directory = "/root/autodl-tmp/GoldSparrow/Day_Data/test_raw_ta"
+    input_directory = "/home/godlike/project/GoldSparrow/Day_Data/test_raw"
+    output_directory = "/home/godlike/project/GoldSparrow/Day_Data/test_raw_ta"
     threshold = "2024-12-30"  # 设置阈值日期，格式为 YYYY-MM-DD
     process_files(input_directory, output_directory, threshold)

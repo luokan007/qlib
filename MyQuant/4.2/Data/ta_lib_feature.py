@@ -12,13 +12,14 @@ from joblib import Parallel, delayed
 from tqdm import tqdm  
 from rsrs_feature import RSRSFeature
 from cpv_feature import CPVFeature
+from str_feature import STRFeature
 
 
 
 class TALibFeatureExt:
     """_summary_
     """
-    def __init__(self, basic_info_path, time_range=30, stock_pool_path=None, cpv_feature_config_path=None, n_jobs=-1):
+    def __init__(self, basic_info_path, time_range=30, stock_pool_path=None, cpv_feature_config_path=None, rsrs_cache_path=None, n_jobs=-1):
         """初始化特征生成器"""
         # 定义要生成的技术指标及其参数
         self.window_size_global = max(time_range, 60) ###time_range是STR因子所需的时间窗口，48是EMA等ta-lib因子所需的时间窗口,取60是一个更加安全的边界
@@ -36,6 +37,9 @@ class TALibFeatureExt:
             self.cpv_df = None
         
         self.n_jobs = n_jobs
+        
+        self.rsrs_feature_cls = RSRSFeature(time_range=20, window_size=500, cache_path=rsrs_cache_path)
+        self.str_feature_cls = STRFeature(time_range=time_range, n_jobs=n_jobs)
 
         self.feature_functions = {
             'EMA': {'timeperiod': [5, 10, 20]},
@@ -133,7 +137,15 @@ class TALibFeatureExt:
             self.stock_pool = None
 
     def _create_stock_slice_df(self, stock_data):
-        """创建包含日期、代码、涨跌幅和成交量的数据框"""
+        """创建包含日期、代码、涨跌幅和成交量的数据框
+        数据样例：
+                              pctChg    amount
+        date        code                       
+        2023-01-01  000001     1.2      100000
+                    000002     0.8      120000
+        2023-01-02  000001    -0.5       80000
+                    000002     1.5       90000
+        """
         print("Creating stock slice DataFrame...")
         dataframes = []
         for code, df in stock_data.items():
@@ -182,7 +194,6 @@ class TALibFeatureExt:
         # 2008-01-07     17
         # 2008-01-08     17
 
-
         ##计算STR凸显性因子
         return_df = pd.DataFrame()
         return_df['pctChg'] = self.stock_slice_df['pctChg']
@@ -203,11 +214,11 @@ class TALibFeatureExt:
 # 2025-02-06   0.3030   2.6434   0.4082   0.7246   0.1333      NaN   0.6667   4.0936  -0.9006   2.0050      NaN  ...   0.5714   9.9831      NaN      NaN   2.2801   2.8730  -1.0467   4.0130      NaN   0.1381      NaN
 # 2025-02-07   1.2085  -0.8219   0.0000   3.9568   0.5326      NaN   1.3245   0.2809   2.5179   0.9828      NaN  ...   0.7102   1.7949      NaN      NaN   3.1847  -0.5124   0.0814   1.8706      NaN  -0.0690      NaN
 # 2025-02-10   3.5821  -0.6630   1.4228   2.0761   0.6623      NaN   3.2680  -0.2801   3.6187   0.7299      NaN  ...  -0.5642   0.5038      NaN      NaN   6.4815  -0.1288  -0.9756   2.1423      NaN   0.5521      NaN
-        
+
         print("generate STR factors...")
         # 使用新的优化函数来计算每天的STR因子
-        self._str_factor_df = self.calculate_daily_str_factors(pivot_return_df)
-        #print(_str_factor_df)
+        self._str_factor_df = self.str_feature_cls.calculate_str_features(pivot_return_df)
+        #print(self._str_factor_df)  # Include this line to check the generated STR factors
         #                       pctChg                                                                                                                                           
         # code        sz002090  sz002091  sz002092  sz002093  sz002094  sz002095  sz002096 sz002097  sz002098  sz002099  sz002100  sz002101  sz002102  sz002103  sz002104
         # date                                                                                                                                                           
@@ -219,122 +230,7 @@ class TALibFeatureExt:
         # 2008-01-09       NaN       NaN       NaN       NaN       NaN       NaN       NaN      NaN       NaN       NaN       NaN       NaN       NaN       NaN       NaN
         # 2008-01-10  0.226865 -1.435706  0.038047  0.268147  0.713251 -0.198438   1.18973      NaN  0.647639 -0.375385 -0.418327  0.186402 -0.698619  1.999057  0.424592
         # 2008-01-11 -0.134092 -0.225108 -0.188916 -0.137051 -0.129813  -0.75082  0.756377      NaN    0.6385 -0.676059       NaN -0.496476 -0.597598    -0.235 -0.339108
-        print("success")
-
-    def _calc_str_sigma(self, code_return_df: pd.DataFrame, theta=0.1):
-        """_summary_
-
-        Args:
-            code_return_df (pd.DataFrame): _description_
-            theta (float, optional): _description_. Defaults to 0.1.
-
-        Returns:
-            _type_: _description_
-        """
-        _median = code_return_df.median(axis=1)
-        df_frac1 = code_return_df.sub(_median,axis=0).abs()
-        df_frac2 = code_return_df.abs().add(_median.abs(),axis=0) + theta
-        return df_frac1.div(df_frac2)
-
-    def _calc_str_weight(self, sigma: pd.DataFrame, cur_date, delta=0.7):
-        """_summary_
-            计算凸显性权重
-        Args:
-            sigma (_type_): _description_
-            time_rage (int, optional): _description_. Defaults to 22.
-            delta (float, optional): _description_. Defaults to 0.7.
-        """
-        # Get all dates up to cur_date and take the last time_range rows
-        time_range = self.time_range
-        
-        df = sigma.loc[:cur_date].iloc[-time_range:]
-        df_cleaned = df.dropna(axis=1, how='any')
-        df_rank= df_cleaned.rank(axis=0,ascending=False)
-        frac1 = df_rank.apply(lambda x: np.power(delta,x))
-        frac2 = frac1.mean(axis=1)
-        weight = frac1.div(frac2,axis=0)
-        assert frac1.iloc[0,1] / frac2.iloc[0] == weight.iloc[0,1]
-        return weight
-
-    def _STR_factor(self,
-             weight: pd.DataFrame,
-             return_df: pd.DataFrame,
-             cur_date):
-        """_summary_
-
-        Args:
-            weight (pd.DataFrame): _description_
-        """
-        time_range = self.time_range
-        ret_df = weight.rolling(time_range).cov(return_df)#.iloc[-1,:]
-        #print(ret_df.loc[cur_date])
-        #                       code   
-        # pctChg  sz002090    0.226865
-        #         sz002091   -1.435706
-        #         sz002092    0.038047
-        #         sz002093    0.268147
-        #         sz002094    0.713251
-        return ret_df.loc[cur_date]
-
-    def calculate_daily_str_factors(self, pivot_return_df: pd.DataFrame):
-        """
-        计算每一天的STR因子。
-        
-        Args:
-            pivot_return_df (pd.DataFrame): 每日回报率数据框，其中索引是日期，列为不同的股票代码。
-            
-        Returns:
-            pd.DataFrame: 每天的STR因子数据框，其中索引是日期，列为不同的股票代码。
-        """
-        ## 检查pivot_return_df每一行的数据，如果空值大于5条，则drop掉该行，并打印drop掉的行的索引
-        before_drop = len(pivot_return_df)
-        pivot_return_df = pivot_return_df.dropna(thresh=5)
-        print("drop NA line for STR computing:", before_drop - len(pivot_return_df))
-
-        time_range = self.time_range
-        # 创建一个空的DataFrame来存储每天的STR因子
-        str_factors = pd.DataFrame(index=pivot_return_df.index, columns=pivot_return_df.columns)
-
-        sigma = self._calc_str_sigma(pivot_return_df)
-        
-        def _calculate_str_factor_for_date(cur_date, sigma, return_df):
-            # 为每一天计算weight
-
-            weight = self._calc_str_weight(sigma=sigma, cur_date=cur_date)
-            str_factor = self._STR_factor(weight=weight, return_df=return_df, cur_date=cur_date)
-            return str_factor
-
-        # 遍历每一天
-        dates_to_process = pivot_return_df.index[time_range:]
-        results = []
-        
-        # for date in tqdm(dates_to_process, desc='Calculating STR factors'):
-        #     result = _calculate_str_factor_for_date(date, sigma, pivot_return_df)
-        #     results.append(result)
-        
-        # 使用joblib进行并行计算
-        results = Parallel(n_jobs=self.n_jobs)(
-            delayed(_calculate_str_factor_for_date)(date, sigma, pivot_return_df)
-            for date in tqdm(dates_to_process, desc='Calculating STR factors')
-        )
-        
-        # 将结果存入str_factors DataFrame
-        for date, str_factor in zip(dates_to_process, results):
-            str_factors.loc[date] = str_factor
-
-        # # 遍历每一天
-        # for date in pivot_return_df.index[time_range:]:
-
-        #     # 为每一天计算weight
-        #     weight = self._calc_str_weight(sigma=sigma, cur_date=date, time_range=time_range)
-        #     str_factor = self._STR_factor(weight=weight, return_df=pivot_return_df, cur_date=date, time_range=time_range)
-
-        #     # 将STR因子存入str_factors DataFrame
-        #     str_factors.loc[date] = str_factor
-            
-        #     #print(str_factors.head(20))
-
-        return str_factors
+        print("success")      
 
     def generate_slice_features(self, code):
         """新增基于横截面的特征
@@ -354,23 +250,6 @@ class TALibFeatureExt:
 
         features['DAILY_AMOUNT_RATIO'] = np.log( (df['amount'] + 1) / self.amount_df['amount'] )
 
-        ## step 2:计算STR凸显性因子
-        # print(self._str_factor_df.index)
-        # print(self._str_factor_df.columns)
-        # print(self._str_factor_df.info())
-        # # 检查是否存在多级索引
-        # if isinstance(self._str_factor_df.index, pd.MultiIndex):
-        #     print("\nThe DataFrame has a MultiIndex.")
-        #     print("Levels of the MultiIndex:")
-        #     for i, level in enumerate(self._str_factor_df.index.levels):
-        #         print(f"Level {i}: {level.name} - {level.dtype}")
-        
-        # if code in self._str_factor_df.columns:
-        #     print("Column found and data extracted.")
-        # else:
-        #     print("Column 'sz002092' not found in the DataFrame.")
-            
-            
         str_series = self._str_factor_df[('pctChg', code)]
 
         # ## object对象，导致后续错误，debug其中的原因
@@ -733,7 +612,7 @@ class TALibFeatureExt:
 
         return pd.DataFrame(features, index=df.index)
     
-    def generate_rsrs_features(self, df):
+    def generate_rsrs_features(self, df, stock_id):
         """
         新增RSRS特征
         Args:
@@ -747,7 +626,7 @@ class TALibFeatureExt:
         assert 'low' in df.columns
 
         ## RSRS
-        return RSRSFeature.calculate_rsrs_features(df=df, time_range=20,window_size=500) ##2年的数据作为时间窗口
+        return self.rsrs_feature_cls.calculate_rsrs_features(df=df, stock_id=stock_id)
 
     def _check_file_status(self, input_path: Path, output_path: Path) -> dict:
         """检查文件状态，判断是否需要更新
@@ -831,10 +710,10 @@ class TALibFeatureExt:
                 #['SIZE', 'EMA_5', 'EMA_10', 'EMA_20', 'SAR', 'KAMA_12', 'KAMA_24', 'KAMA_48', 'TEMA_12', 'TEMA_24', 'TEMA_48', 'TRIMA_12', 'TRIMA_24', 'TRIMA_48', 'ADX_14', 'ADX_28', 'APO', 'AROON_14_down', 'AROON_14_up', 'AROON_28_down', 'AROON_28_up', 'BOP', 'CCI_14', 'CCI_28', 'CMO_14', 'CMO_28', 'MACD', 'MACD_SIGNAL', 'MACD_HIST', 'MOM_6', 'MOM_12', 'MOM_24', 'MOM_48', 'MFI_6', 'MFI_12', 'MFI_24', 'MFI_48', 'ROC_6', 'ROC_12', 'ROC_24', 'ROC_48', 'RSI_6', 'RSI_12', 'RSI_24', 'STOCHF_k', 'STOCHF_d', 'STOCHRSI_k', 'STOCHRSI_d', 'TRIX_12', 'TRIX_24', 'TRIX_48', 'ULTOSC', 'WILLR_6', 'WILLR_12', 'WILLR_24', 'WILLR_48', 'AD', 'ADOSC', 'OBV', 'ATR_14', 'ATR_28', 'NATR_14', 'NATR_28', 'TRANGE', 'LINEARREG_SLOPE_5', 'LINEARREG_SLOPE_14', 'LINEARREG_SLOPE_28', 'TSF_5', 'TSF_10', 'TSF_20', 'TSF_40', 'VAR_5', 'VAR_10', 'VAR_20', 'VAR_40', 'TURN_RATE_LN', 'TURN_MAX_5', 'TURN_MAX_10', 'TURN_MAX_20', 'TURN_MAX_40', 'TURN_MIN_5', 'TURN_MIN_10', 'TURN_MIN_20', 'TURN_MIN_40', 'TURN_RATE_EMA_5', 'TURN_RATE_EMA_10', 'TURN_RATE_EMA_20', 'TURN_ROC_5', 'TURN_ROC_10', 'TURN_ROC_20', 'TURN_ROC_40', 'TURN_SLOPE_5', 'TURN_SLOPE_10', 'TURN_SLOPE_20', 'TURN_SLOPE_40', 'TURN_RSI_5', 'TURN_RSI_10', 'TURN_RSI_20', 'TURN_RSI_40', 'TURN_TSF_5', 'TURN_TSF_10', 'TURN_TSF_20', 'TURN_TSF_40', 'AMOUNT_LN', 'AMT_MAX_5', 'AMT_MAX_10', 'AMT_MAX_20', 'AMT_MAX_40', 'AMT_MIN_5', 'AMT_MIN_10', 'AMT_MIN_20', 'AMT_MIN_40', 'AMT_EMA_5', 'AMT_EMA_10', 'AMT_EMA_20', 'AMT_EMA_40', 'AMT_ROC_5', 'AMT_ROC_10', 'AMT_ROC_20', 'AMT_ROC_40', 'AMT_TRIX_5', 'AMT_TRIX_10', 'AMT_TRIX_20', 'AMT_TRIX_40', 'AMT_SLOPE_5', 'AMT_SLOPE_10', 'AMT_SLOPE_20', 'AMT_SLOPE_40', 'AMT_RSI_5', 'AMT_RSI_10', 'AMT_RSI_20', 'AMT_RSI_40', 'AMT_TSF_5', 'AMT_TSF_10', 'AMT_TSF_20', 'AMT_TSF_40', 'AMT_VAR_5', 'AMT_VAR_10', 'AMT_VAR_20', 'AMT_VAR_40']
                 #print(new_features.info())
                 # <class 'pandas.core.frame.DataFrame'>
-                # DatetimeIndex: 4 entries, 2025-01-27 to 2025-02-07
+                # DatetimeIndex: 2055 entries, 2016-08-15 to 2025-02-10
                 # Columns: 140 entries, SIZE to AMT_VAR_40
                 # dtypes: float64(140)
-                # memory usage: 4.4 KB
+                # memory usage: 2.2 MB
                 #print(new_features.tail())
 
                 slice_features = self.generate_slice_features(code)
@@ -850,9 +729,19 @@ class TALibFeatureExt:
                 #  2   RANK                4 non-null      float64
                 # dtypes: float64(2), object(1)
                 # memory usage: 128.0+ bytes
+                # <class 'pandas.core.frame.DataFrame'>
+                # DatetimeIndex: 2055 entries, 2016-08-15 to 2025-02-10
+                # Data columns (total 3 columns):
+                # #   Column              Non-Null Count  Dtype  
+                # ---  ------              --------------  -----  
+                # 0   DAILY_AMOUNT_RATIO  2055 non-null   float64
+                # 1   STR_FACTOR          2043 non-null   float64
+                # 2   RANK                2055 non-null   float64
+                # dtypes: float64(3)
+                # memory usage: 128.8 KB
                 #print(slice_features.tail())
 
-                rsrs_features = self.generate_rsrs_features(rsrs_df)
+                rsrs_features = self.generate_rsrs_features(df=rsrs_df, stock_id=code)
                 #rsrs_features = rsrs_features[rsrs_features.index > last_date]
                 #print(rsrs_features.info())
                 # <class 'pandas.core.frame.DataFrame'>
@@ -866,16 +755,42 @@ class TALibFeatureExt:
                 # 3   pos_RSRS     4 non-null      float64
                 # dtypes: float64(4)
                 # memory usage: 160.0 bytes
+                # <class 'pandas.core.frame.DataFrame'>
+                # DatetimeIndex: 2545 entries, 2014-07-17 to 2025-02-10
+                # Data columns (total 4 columns):
+                # #   Column       Non-Null Count  Dtype  
+                # ---  ------       --------------  -----  
+                # 0   base_RSRS    2526 non-null   float64
+                # 1   norm_RSRS    2027 non-null   float64
+                # 2   revise_RSRS  2027 non-null   float64
+                # 3   pos_RSRS     2027 non-null   float64
+                # dtypes: float64(4)
+                # memory usage: 99.4 KB
                 #print(rsrs_features.tail())
 
                 input_df = df[df.index > last_date]
-                
-                if cpv_df is not None:
-                    cpv_df = cpv_df[cpv_df.index > last_date]
-                    new_features = pd.concat([rsrs_features, cpv_df], axis=1, join="left")
 
+                if cpv_df is None:
+                    # 列为空值
+                    cpv_df = pd.DataFrame()
+                    cpv_df["cpv"] = np.nan
+                # 情况 2: 检查是否是 Pandas DataFrame 且为空
+                elif isinstance(cpv_df, pd.DataFrame) and cpv_df.empty:
+                    cpv_df["cpv"] = np.nan
+                # 情况 3: 检查是否是 Pandas DataFrame 且不为空
+                elif isinstance(cpv_df, pd.DataFrame) and not cpv_df.empty:
+                    pass # do nothing
+                else:
+                    raise ValueError("Invalid state for cpv_df.")
+                    
                 # 拼接数据
-                updated_df = pd.concat([input_df, new_features_aligned, slice_features_aligned, rsrs_features_aligned], axis=1, join="left")
+                #对齐索引
+                new_features_aligned = new_features.reindex(input_df.index)
+                slice_features_aligned = slice_features.reindex(input_df.index)
+                rsrs_features_aligned = rsrs_features.reindex(input_df.index)
+                cpv_feature_aligned = cpv_df.reindex(input_df.index)
+
+                updated_df = pd.concat([input_df, new_features_aligned, slice_features_aligned, rsrs_features_aligned, cpv_feature_aligned], axis=1)
                 #print(updated_df.columns.to_list())
                 #print(updated_df.head())
                 #print(updated_df.info())
@@ -898,22 +813,40 @@ class TALibFeatureExt:
             else:
                 new_features = self.generate_single_stock_features(df)
                 slice_features = self.generate_slice_features(code)
-                rsrs_features = self.generate_rsrs_features(rsrs_df)
+                rsrs_features = self.generate_rsrs_features(df=rsrs_df,stock_id=stock_id)
                 input_df = df
-                
-                if cpv_df is not None:
-                    cpv_df = cpv_df[cpv_df.index > last_date]
-                    new_features = pd.concat([rsrs_features, cpv_df], axis=1, join="left")
+
+                if cpv_df is None:
+                    # 列为空值
+                    cpv_df = pd.DataFrame()
+                    cpv_df["cpv"] = np.nan
+                # 情况 2: 检查是否是 Pandas DataFrame 且为空
+                elif isinstance(cpv_df, pd.DataFrame) and cpv_df.empty: 
+                    cpv_df["cpv"] = np.nan
+                # 情况 3: 检查是否是 Pandas DataFrame 且不为空
+                elif isinstance(cpv_df, pd.DataFrame) and not cpv_df.empty:
+                    # print(cpv_df.info())
+                    # <class 'pandas.core.frame.DataFrame'>
+                    # DatetimeIndex: 3860 entries, 2008-01-02 to 2024-12-31
+                    # Data columns (total 1 columns):
+                    # #   Column  Non-Null Count  Dtype  
+                    # ---  ------  --------------  -----  
+                    # 0   cpv     3586 non-null   float64
+                    # dtypes: float64(1)
+                    # memory usage: 60.3 KB
+                    pass # do nothing
+                else:
+                    raise ValueError("Invalid state for cpv_df.")
 
                 # 合并特征
-                # 手动对齐索引
+                #对齐索引
                 new_features_aligned = new_features.reindex(input_df.index)
                 slice_features_aligned = slice_features.reindex(input_df.index)
                 rsrs_features_aligned = rsrs_features.reindex(input_df.index)
+                cpv_feature_aligned = cpv_df.reindex(input_df.index)
 
-                # 拼接数据
-                updated_df = pd.concat([input_df, new_features_aligned, slice_features_aligned, rsrs_features_aligned], axis=1)
-                
+                updated_df = pd.concat([input_df, new_features_aligned, slice_features_aligned, rsrs_features_aligned, cpv_feature_aligned], axis=1)
+
                 # 保存结果
                 updated_df.to_csv(output_path)
                 return updated_df.columns.tolist()
@@ -996,22 +929,37 @@ class TALibFeatureExt:
 
         # 3. 并行处理需要更新的文件
         print("Processing updates...")
-        results = Parallel(n_jobs=self.n_jobs)(
-            delayed(self._process_stock_data_incremental)(
-                file_info['stock_id'],
-                stock_data[file_info['stock_id']],
-                stock_data_rsrs[file_info['stock_id']],
-                self.cpv_df[file_info['stock_id']] if self.cpv_df is not None else None,
-                file_info['output_path'],
-                file_info['last_date']
+        if self.cpv_df is not None:
+            results = Parallel(n_jobs=self.n_jobs)(
+                delayed(self._process_stock_data_incremental)(
+                    file_info['stock_id'],
+                    stock_data[file_info['stock_id']],
+                    stock_data_rsrs[file_info['stock_id']],
+                    self.cpv_df[file_info['stock_id']] if file_info['stock_id'] in self.cpv_df else None,
+                    file_info['output_path'],
+                    file_info['last_date']
+                )
+                for file_info in tqdm(update_files, desc="Updating files")
             )
-            for file_info in tqdm(update_files, desc="Updating files")
-        )
+        else:
+            results = Parallel(n_jobs=self.n_jobs)(
+                delayed(self._process_stock_data_incremental)(
+                    file_info['stock_id'],
+                    stock_data[file_info['stock_id']],
+                    stock_data_rsrs[file_info['stock_id']],
+                    None,
+                    file_info['output_path'],
+                    file_info['last_date']
+                )
+                for file_info in tqdm(update_files, desc="Updating files")
+            )
+        # 保存缓存
+        self.rsrs_feature_cls.save_cache()
 
         # 4. 更新特征名称
         for cols_new in results:
             feature_names.update(cols_new)
-        self.output_feature_meta(file_path = feature_meta_file, feature_name_set=feature_names)
+        self.output_feature_meta(file_path=feature_meta_file, feature_name_set=feature_names)
 
         print(f"Successfully processed {len(results)} files")
 
@@ -1044,22 +992,22 @@ class TALibFeatureExt:
             json.dump(feature_meta_dic, f, indent=4)
 
 def __test__():
-    #working_folder = '/home/godlike/project/GoldSparrow/Day_Data' ## 本地测试
-    working_folder = '/root/autodl-tmp/GoldSparrow/Day_Data' ## 服务器测试
+    working_folder = '/home/godlike/project/GoldSparrow/Day_Data' ## 本地测试
+    #working_folder = '/root/autodl-tmp/GoldSparrow/Day_Data' ## 服务器测试
 
     basic_info_path = f"{working_folder}/qlib_data/basic_info.csv"
     in_folder = f"{working_folder}/test_raw"
     out_folder = f"{working_folder}/test_raw_ta"
     feature_meta_file = f"{working_folder}/feature_names.json"
-    cpv_feature_config_path = f"{working_folder}/cpv_feature.json"
-    stock_pool_file = f"{working_folder}/qlib_data/instruments/csi300.txt"
+    cpv_feature_config_path = "/home/godlike/project/GoldSparrow/Min_Data/config.json"
+    #stock_pool_file = f"{working_folder}/qlib_data/instruments/csi300.txt"
 
     feature_generator = TALibFeatureExt(
         basic_info_path=basic_info_path,
         time_range=5,
         stock_pool_path=None,
         cpv_feature_config_path=cpv_feature_config_path,
-        n_jobs=32
+        n_jobs=-1
     )
     # 使用增量更新方法
     feature_generator.process_directory_incremental(in_folder, out_folder, feature_meta_file)
