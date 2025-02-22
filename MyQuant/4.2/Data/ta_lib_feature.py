@@ -811,6 +811,8 @@ class TALibFeatureExt:
                 return result.columns.tolist()
 
             else:
+                
+                
                 new_features = self.generate_single_stock_features(df)
                 slice_features = self.generate_slice_features(code)
                 rsrs_features = self.generate_rsrs_features(df=rsrs_df,stock_id=stock_id)
@@ -837,6 +839,24 @@ class TALibFeatureExt:
                     pass # do nothing
                 else:
                     raise ValueError("Invalid state for cpv_df.")
+                
+                # 检查bug
+                if stock_id =="sz002457":
+                    print("######new_features######")
+                    print(new_features.info())       
+                    print("######slice_features######")
+                    print(slice_features.info())
+                    print("######rsrs_features######")
+                    print(rsrs_features.info())
+                    print("######cpv_df######")
+                    print(cpv_df.info())
+                    print("-------------------")
+                    print(f"index duplicate status: {new_features.index.has_duplicates} {slice_features.index.has_duplicates} {rsrs_features.index.has_duplicates} {cpv_df.index.has_duplicates}")
+                    print(f"columns duplicate status: {new_features.columns.has_duplicates}  {slice_features.columns.has_duplicates} {rsrs_features.columns.has_duplicates} {cpv_df.columns.has_duplicates}")
+
+                    # 查看重复的索引值
+                    duplicates = cpv_df.index[cpv_df.index.duplicated()]
+                    print(duplicates)
 
                 # 合并特征
                 #对齐索引

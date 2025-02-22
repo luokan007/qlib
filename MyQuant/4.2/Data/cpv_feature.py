@@ -118,6 +118,43 @@ class CPVFeature:
         
         # 只返回 cpv 列
         return df_ms[['cpv']]
+    
+    def data_verify(self, df: pd.DataFrame, code: str):
+        """
+        验证数据的完整性和格式
+        1. 索引为时间，列仅有一列，为cpv
+        2. 年份连续
+        3. 月份连续
+        4. 索引没有重复
+        """
+
+        if not pd.api.types.is_datetime64_any_dtype(df.index):
+            print(f"[索引格式类型错误] {code}")
+            print(df.info())
+
+        if df.shape[1] != 1:
+            print(f"[dataframe必须只有一列] {code}")
+            print(df.info())
+        
+
+        years = df.index.year.unique()
+        if len(years) != (years.max() - years.min() + 1):
+            print(f"[年份不连续] {code}")
+            print(years)
+
+        # 按年份分组，检查每一年的月份是否连续
+        for year, group in df.groupby(df.index.year):
+            months = group.index.month.unique()
+
+            if len(months) > 0:
+                expected_months_count = months.max() - months.min() + 1
+                if len(months) != expected_months_count:
+                    print(f"[月份不连续] 年份: {year}, Code: {code}")
+
+        if df.index.has_duplicates:
+            print(f"[索引有重复值] {code}")
+            duplicates = df.index[df.index.duplicated()]
+            print(duplicates)
 
     def offline_process(self):
         """
@@ -176,6 +213,10 @@ class CPVFeature:
         
         for code in tqdm(sorted(codes), desc="Saving CPV data"):
             output_file = self.output_dir / f"{code}.csv"
+            
+            ## 检测数据的可靠性
+            self.data_verify(all_data[code], code)
+            
             all_data[code].to_csv(output_file)
             #print(f"Saved CPV data to {output_file}")
         start_date = min(df.index.min() for df in all_data.values())
